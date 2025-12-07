@@ -1,0 +1,47 @@
+[
+  {
+    "id": "97d063f2-7bbb-4ffc-9e90-bff6effe818a",
+    "login": "admin",
+    "password": "$2b$10$xQ88KkesL7mbz0yx/KeLk./1hQuPwDBOVoth7xRAyQ4IjCp4BdOkq",
+    "firstName": "Administrator",
+    "lastName": "System",
+    "apartments": [
+      {
+        "number": "D.3.21",
+        "shareAmount": "76",
+        "additionalInfo": "Widok na hotel. Krótki balkon. Parking nr 63",
+        "status": "lease_agreement"
+      }
+    ],
+    "role": "admin",
+    "permissions": {
+      "viewCalendar": true,
+      "addEvent": true,
+      "deleteEvent": true
+    },
+    "phoneNumber": "",
+    "email": ""
+  },
+  {
+    "id": "62265dbd-35a2-49d8-8296-d0ad86e652ea",
+    "login": "test",
+    "password": "$2b$10$lVaz.6k5nRXkvXXMoymI1eLNwvIigT.Sep4sqsqzphaMUA6M9wW5C",
+    "firstName": "test",
+    "lastName": "test",
+    "apartments": [
+      {
+        "number": "1",
+        "shareAmount": "0",
+        "additionalInfo": "12"
+      }
+    ],
+    "phoneNumber": "12",
+    "email": "1@1.com",
+    "role": "user",
+    "permissions": {
+      "viewCalendar": true,
+      "addEvent": false,
+      "deleteEvent": false
+    }
+  }
+]
