@@ -24,16 +24,22 @@ const calculateEaster = (year: number): Date => {
   return new Date(year, month - 1, day);
 };
 
-// Dodaj dni do daty i zwróć string YYYY-MM-DD
+// Dodaj dni do daty i zwróć string YYYY-MM-DD (FIX dla strefy czasowej)
 const addDays = (date: Date, days: number): string => {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
-  return result.toISOString().split('T')[0];
+  const year = result.getFullYear();
+  const month = String(result.getMonth() + 1).padStart(2, '0');
+  const day = String(result.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
-// Formatuj datę do YYYY-MM-DD
+// Formatuj datę do YYYY-MM-DD (FIX dla strefy czasowej)
 const formatDate = (date: Date): string => {
-  return date.toISOString().split('T')[0];
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 export const getPolishHolidays = (year: number): Holiday[] => {
