@@ -125,7 +125,12 @@ const calendarDays = computed(() => {
 });
 
 const createCalendarDay = (date: Date, isCurrentMonth: boolean): CalendarDay => {
-  const dateString = date.toISOString().split('T')[0];
+  // FIX: Użyj lokalnej daty zamiast UTC - unikaj toISOString()
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const dateString = `${year}-${month}-${day}`;
+  
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
@@ -337,4 +342,3 @@ const handleEventClick = (event: Event) => {
   }
 }
 </style>
-
