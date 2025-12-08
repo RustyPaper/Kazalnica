@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
+import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import usersRoutes from './routes/users';
 import eventsRoutes from './routes/events';
@@ -8,43 +9,22 @@ import permissionsRoutes from './routes/permissions';
 import settingsRoutes from './routes/settings';
 import statisticsRoutes from './routes/statistics';
 
-const app = express();
-const PORT = 3000;
+dotenv.config();
 
-// CORS - MUSI BYĆ PRZED INNYMI MIDDLEWARE
+const app = express();
+const PORT = parseInt(process.env.PORT || '3000', 10);
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+// CORS
 app.use(cors({
-  origin: [
-    'https://gamming.tail4ba063.ts.net',
-    'http://localhost:5173',
-    'http://localhost:3000'
-  ],
+  origin: [FRONTEND_URL, 'http://localhost:5173'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// CSP Headers
-app.use((req, res, next) => {
-  res.setHeader(
-    'Content-Security-Policy',
-    "default-src 'self' https://gamming.tail4ba063.ts.net http://localhost:*; " +
-    "connect-src 'self' https://gamming.tail4ba063.ts.net http://localhost:* ws://localhost:* wss://*; " +
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-    "style-src 'self' 'unsafe-inline'; " +
-    "img-src 'self' data: https: blob:; " +
-    "font-src 'self' data:;"
-  );
-  next();
-});
-
 // Body parser
 app.use(bodyParser.json());
-
-// Debug middleware
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path} from ${req.get('origin')}`);
-  next();
-});
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -69,9 +49,8 @@ app.listen(PORT, '0.0.0.0', () => {
 ║  Kalendarz Apartamentów - Server                       ║
 ╠════════════════════════════════════════════════════════╣
 ║  Status: Running                                       ║
-║  Port: ${PORT}                                              ║
-║  Local: http://localhost:${PORT}                            ║
-║  Tailscale: https://gamming.tail4ba063.ts.net/api      ║
+║  Port: ${PORT}                                         ║
+║  Environment: ${process.env.NODE_ENV || 'development'} ║
 ╚════════════════════════════════════════════════════════╝
   `);
 });
