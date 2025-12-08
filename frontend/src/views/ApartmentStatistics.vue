@@ -440,5 +440,109 @@ onMounted(async () => {
     padding: 8px;
   }
 }
+/* Mobile responsive */
+@media (max-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .status-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-value {
+    font-size: 28px;
+  }
+
+  .stat-icon {
+    font-size: 32px;
+  }
+
+  .status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .status-icon {
+    font-size: 30px;
+  }
+
+  .status-count {
+    font-size: 24px;
+  }
+
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .apartments-table {
+    min-width: 600px;
+  }
+
+  .apartments-table th,
+  .apartments-table td {
+    padding: 8px 6px;
+    font-size: 13px;
+  }
+
+  .shares-cell {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .stat-card {
+    flex-direction: column;
+    text-align: center;
+    padding: 15px;
+  }
+
+  .stat-icon {
+    font-size: 36px;
+  }
+
+  .stat-value {
+    font-size: 24px;
+  }
+
+  .stat-label {
+    font-size: 13px;
+  }
+
+  .progress-container {
+    height: 30px;
+  }
+
+  .progress-text {
+    font-size: 14px;
+  }
+
+  .status-card {
+    padding: 15px;
+  }
+
+  .status-icon {
+    font-size: 28px;
+  }
+
+  .status-count {
+    font-size: 20px;
+  }
+
+  .apartments-table {
+    font-size: 12px;
+  }
+
+  .apartments-table th,
+  .apartments-table td {
+    padding: 6px 4px;
+  }
+}
 </style>
 

@@ -341,4 +341,109 @@ const handleEventClick = (event: Event) => {
     padding: 2px 4px;
   }
 }
+
+/* Mobile responsive dla kalendarza */
+@media (max-width: 1024px) {
+  .calendar-day {
+    min-height: 80px;
+    padding: 6px;
+  }
+
+  .calendar-day-number {
+    font-size: 14px;
+  }
+
+  .holiday-name {
+    font-size: 10px;
+  }
+
+  .calendar-event {
+    font-size: 11px;
+    padding: 3px 5px;
+  }
+}
+
+@media (max-width: 768px) {
+  .calendar-header {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .calendar-header h2 {
+    font-size: 20px;
+  }
+
+  .calendar-header .btn {
+    width: 100%;
+  }
+
+  .calendar-grid {
+    gap: 2px;
+  }
+
+  .calendar-day {
+    min-height: 70px;
+    padding: 4px;
+  }
+
+  .calendar-day-header {
+    padding: 8px 4px;
+    font-size: 12px;
+  }
+
+  .calendar-day-number {
+    font-size: 13px;
+    margin-bottom: 2px;
+  }
+
+  .holiday-name {
+    font-size: 9px;
+    line-height: 1.1;
+  }
+
+  .calendar-event {
+    font-size: 10px;
+    padding: 2px 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .calendar-day {
+    min-height: 60px;
+    padding: 3px;
+  }
+
+  .calendar-day-number {
+    font-size: 12px;
+  }
+
+  .holiday-name {
+    font-size: 8px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .calendar-event {
+    font-size: 9px;
+    padding: 1px 3px;
+  }
+
+  .calendar-day-header {
+    font-size: 11px;
+    padding: 6px 2px;
+  }
+}
+
+/* Landscape mode dla telefonów */
+@media (max-width: 900px) and (orientation: landscape) {
+  .calendar-day {
+    min-height: 50px;
+  }
+
+  .holiday-name {
+    display: none;
+  }
+}
 </style>

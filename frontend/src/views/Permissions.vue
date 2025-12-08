@@ -8,45 +8,47 @@
       </div>
       
       <div v-else>
-        <table style="width: 100%; border-collapse: collapse;">
-          <thead>
-            <tr style="background-color: #f8f9fa;">
-              <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Login</th>
-              <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Imię i nazwisko</th>
-              <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Rola</th>
-              <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Akcje</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="user in users" :key="user.id" style="border-bottom: 1px solid #dee2e6;">
-              <td style="padding: 10px;">{{ user.login }}</td>
-              <td style="padding: 10px;">{{ user.firstName }} {{ user.lastName }}</td>
-              <td style="padding: 10px;">
-                <span :class="user.role === 'admin' ? 'badge-admin' : 'badge-user'">
-                  {{ user.role === 'admin' ? 'Administrator' : 'Użytkownik' }}
-                </span>
-              </td>
-              <td style="padding: 10px;">
-                <div style="display: flex; gap: 8px;">
-                  <button
-                    class="btn btn-primary"
-                    @click="openPermissionsModal(user)"
-                    :disabled="user.id === authStore.user?.id"
-                  >
-                    Edytuj uprawnienia
-                  </button>
-                  <button
-                    class="btn btn-danger"
-                    @click="openDeleteModal(user)"
-                    :disabled="user.id === authStore.user?.id"
-                  >
-                    Usuń konto
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="table-container">
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="background-color: #f8f9fa;">
+                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Login</th>
+                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Imię i nazwisko</th>
+                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Rola</th>
+                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Akcje</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="user in users" :key="user.id" style="border-bottom: 1px solid #dee2e6;">
+                <td data-label="Login" style="padding: 10px;">{{ user.login }}</td>
+                <td data-label="Imię i nazwisko" style="padding: 10px;">{{ user.firstName }} {{ user.lastName }}</td>
+                <td data-label="Rola" style="padding: 10px;">
+                  <span :class="user.role === 'admin' ? 'badge-admin' : 'badge-user'">
+                    {{ user.role === 'admin' ? 'Administrator' : 'Użytkownik' }}
+                  </span>
+                </td>
+                <td data-label="Akcje" style="padding: 10px;">
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button
+                      class="btn btn-primary"
+                      @click="openPermissionsModal(user)"
+                      :disabled="user.id === authStore.user?.id"
+                    >
+                      Edytuj uprawnienia
+                    </button>
+                    <button
+                      class="btn btn-danger"
+                      @click="openDeleteModal(user)"
+                      :disabled="user.id === authStore.user?.id"
+                    >
+                      Usuń konto
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
     
@@ -270,6 +272,7 @@ onMounted(() => {
   border-radius: 4px;
   font-size: 12px;
   font-weight: 500;
+  display: inline-block;
 }
 
 .badge-user {
@@ -279,6 +282,7 @@ onMounted(() => {
   border-radius: 4px;
   font-size: 12px;
   font-weight: 500;
+  display: inline-block;
 }
 
 .form-group label {
@@ -293,24 +297,109 @@ onMounted(() => {
   cursor: pointer;
 }
 
-.btn-danger {
-  background-color: #dc3545;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.2s;
+.table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-.btn-danger:hover:not(:disabled) {
-  background-color: #c82333;
+/* Mobile responsive */
+@media (max-width: 768px) {
+  table {
+    font-size: 14px;
+  }
+
+  th, td {
+    padding: 8px 6px !important;
+  }
+
+  .btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .badge-admin,
+  .badge-user {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
 }
 
-.btn-danger:disabled {
-  background-color: #e4606d;
-  cursor: not-allowed;
-  opacity: 0.6;
+@media (max-width: 640px) {
+  /* Stack table on mobile */
+  table, thead, tbody, th, td, tr {
+    display: block;
+  }
+
+  thead tr {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+
+  tr {
+    margin-bottom: 15px;
+    border: 1px solid #ddd !important;
+    border-radius: 8px;
+    padding: 10px;
+    background-color: #fff;
+  }
+
+  td {
+    border: none !important;
+    position: relative;
+    padding-left: 45% !important;
+    padding-right: 10px !important;
+    text-align: right !important;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  td:before {
+    position: absolute;
+    left: 10px;
+    width: 40%;
+    padding-right: 10px;
+    white-space: nowrap;
+    text-align: left;
+    font-weight: bold;
+    content: attr(data-label);
+    color: #666;
+    font-size: 13px;
+  }
+
+  td[style*="padding: 10px;"] {
+    padding: 10px 10px 10px 45% !important;
+  }
+
+  td div {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  td .btn {
+    width: 100%;
+    margin-bottom: 5px;
+  }
+
+  .badge-admin,
+  .badge-user {
+    display: inline-block;
+  }
+}
+
+@media (max-width: 480px) {
+  h2 {
+    font-size: 18px !important;
+  }
+
+  .modal {
+    padding: 15px;
+  }
+
+  .modal-title {
+    font-size: 16px;
+  }
 }
 </style>
