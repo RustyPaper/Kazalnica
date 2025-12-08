@@ -4,6 +4,11 @@
       <div class="profile-header">
         <h2>👤 Profil użytkownika</h2>
         <p>Zarządzaj swoimi danymi</p>
+        
+        <!-- Indicator synchronizacji -->
+        <div class="sync-indicator" v-if="isSyncing">
+          <span class="spinner"></span> Synchronizacja danych...
+        </div>
       </div>
       
       <form @submit.prevent="handleUpdate">
@@ -144,8 +149,8 @@
         <div class="error" v-if="error">{{ error }}</div>
         
         <div class="form-actions">
-          <button type="submit" class="btn btn-primary btn-block">
-            💾 Zapisz zmiany
+          <button type="submit" class="btn btn-primary btn-block" :disabled="isSyncing">
+            {{ isSyncing ? '⏳ Zapisywanie...' : '💾 Zapisz zmiany' }}
           </button>
         </div>
       </form>
@@ -154,7 +159,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import type { Apartment } from '../types';
 
@@ -171,6 +176,30 @@ const formData = ref({
 
 const error = ref('');
 const success = ref('');
+const isSyncing = ref(false);
+let refreshInterval: number | null = null;
+
+// Auto-refresh co 30 sekund
+const startAutoRefresh = () => {
+  refreshInterval = window.setInterval(async () => {
+    console.log('🔄 Auto-refresh danych profilu...');
+    await authStore.fetchProfile();
+    
+    // Zaktualizuj formularz jeśli użytkownik nie edytuje
+    if (document.activeElement?.tagName !== 'INPUT' && 
+        document.activeElement?.tagName !== 'TEXTAREA' &&
+        document.activeElement?.tagName !== 'SELECT') {
+      formData.value.apartments = JSON.parse(JSON.stringify(authStore.user?.apartments || []));
+    }
+  }, 30000); // 30 sekund
+};
+
+const stopAutoRefresh = () => {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
+  }
+};
 
 onMounted(() => {
   if (authStore.user) {
@@ -183,6 +212,14 @@ onMounted(() => {
       password: '',
     };
   }
+  
+  // Uruchom auto-refresh
+  startAutoRefresh();
+});
+
+onUnmounted(() => {
+  // Zatrzymaj auto-refresh gdy komponent zostanie zniszczony
+  stopAutoRefresh();
 });
 
 const addApartment = () => {
@@ -202,38 +239,86 @@ const removeApartment = (index: number) => {
 const handleUpdate = async () => {
   error.value = '';
   success.value = '';
+  isSyncing.value = true;
   
   const validApartments = formData.value.apartments.filter(apt => apt.number.trim() !== '');
   
   if (validApartments.length === 0) {
     error.value = 'Musisz podać przynajmniej jeden numer lokalu';
+    isSyncing.value = false;
     return;
   }
   
-  const updateData: any = {
-    firstName: formData.value.firstName,
-    lastName: formData.value.lastName,
-    apartments: validApartments,
-    phoneNumber: formData.value.phoneNumber,
-    email: formData.value.email,
-  };
-  
-  if (formData.value.password) {
-    updateData.password = formData.value.password;
-  }
-  
-  const result = await authStore.updateProfile(updateData);
-  
-  if (result.success) {
-    success.value = 'Profil został zaktualizowany';
-    formData.value.password = '';
+  try {
+    // KROK 1: Pobierz najnowsze dane z serwera
+    console.log('🔄 Synchronizuję dane z serwera...');
+    const fetchResult = await authStore.fetchProfile();
     
-    // Auto-hide success message
-    setTimeout(() => {
-      success.value = '';
-    }, 3000);
-  } else {
-    error.value = result.error || 'Błąd aktualizacji profilu';
+    if (!fetchResult.success) {
+      error.value = 'Błąd synchronizacji. Spróbuj ponownie.';
+      isSyncing.value = false;
+      return;
+    }
+    
+    // KROK 2: Merguj apartamenty
+    const serverApartments = authStore.user?.apartments || [];
+    const localApartments = validApartments;
+    
+    // Utwórz mapę po numerach apartamentów
+    const apartmentMap = new Map();
+    
+    // Najpierw dodaj wszystkie z serwera
+    serverApartments.forEach(apt => {
+      apartmentMap.set(apt.number, apt);
+    });
+    
+    // Potem nadpisz/dodaj lokalne zmiany
+    localApartments.forEach(apt => {
+      apartmentMap.set(apt.number, apt);
+    });
+    
+    // Zamień z powrotem na tablicę
+    const mergedApartments = Array.from(apartmentMap.values());
+    
+    console.log('📊 Apartamenty przed merge:', serverApartments.length);
+    console.log('📊 Apartamenty lokalne:', localApartments.length);
+    console.log('📊 Apartamenty po merge:', mergedApartments.length);
+    
+    // KROK 3: Przygotuj dane do zapisu
+    const updateData: any = {
+      firstName: formData.value.firstName,
+      lastName: formData.value.lastName,
+      apartments: mergedApartments, // Zmergowane dane
+      phoneNumber: formData.value.phoneNumber,
+      email: formData.value.email,
+    };
+    
+    if (formData.value.password) {
+      updateData.password = formData.value.password;
+    }
+    
+    // KROK 4: Zapisz na serwerze
+    console.log('💾 Zapisuję zmienione dane...');
+    const result = await authStore.updateProfile(updateData);
+    
+    if (result.success) {
+      success.value = '✅ Profil został zaktualizowany (zsynchronizowano z serwerem)';
+      formData.value.password = '';
+      
+      // KROK 5: Odśwież formularz z najnowszymi danymi
+      formData.value.apartments = JSON.parse(JSON.stringify(authStore.user?.apartments || []));
+      
+      setTimeout(() => {
+        success.value = '';
+      }, 5000);
+    } else {
+      error.value = result.error || 'Błąd aktualizacji profilu';
+    }
+  } catch (err: any) {
+    console.error('Update error:', err);
+    error.value = 'Błąd synchronizacji danych. Odśwież stronę i spróbuj ponownie.';
+  } finally {
+    isSyncing.value = false;
   }
 };
 </script>
@@ -249,6 +334,7 @@ const handleUpdate = async () => {
   margin-bottom: 30px;
   padding-bottom: 20px;
   border-bottom: 2px solid #f0f0f0;
+  position: relative;
 }
 
 .profile-header h2 {
@@ -259,6 +345,33 @@ const handleUpdate = async () => {
 .profile-header p {
   color: #666;
   font-size: 14px;
+}
+
+.sync-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #007bff;
+  font-size: 14px;
+  margin-top: 10px;
+  padding: 8px;
+  background-color: #e7f3ff;
+  border-radius: 4px;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .form-section {
@@ -344,6 +457,11 @@ const handleUpdate = async () => {
   width: 100%;
 }
 
+.btn-block:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
 /* Mobile responsive */
 @media (max-width: 768px) {
   .profile-card {
@@ -352,6 +470,15 @@ const handleUpdate = async () => {
 
   .profile-header h2 {
     font-size: 24px;
+  }
+
+  .sync-indicator {
+    font-size: 13px;
+  }
+
+  .spinner {
+    width: 14px;
+    height: 14px;
   }
 
   .form-section h3 {

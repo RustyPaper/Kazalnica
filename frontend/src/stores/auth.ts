@@ -1,96 +1,93 @@
 import { defineStore } from 'pinia';
 import axios from 'axios';
-import type { User, LoginCredentials, RegisterData } from '../types';
-import { API_URL } from '../config'; // ← MUSI BYĆ
+import { API_URL } from '../config';
+import type { User } from '../types';
 
-// NIE MOŻE BYĆ:
-// const API_URL = 'http://localhost:3000/api';
-console.log('🔐 Auth store initialized with API_URL:', API_URL);
+interface AuthState {
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+}
 
 export const useAuthStore = defineStore('auth', {
-  state: () => ({
-    user: null as User | null,
-    token: localStorage.getItem('token') || null,
+  state: (): AuthState => ({
+    user: null,
+    token: localStorage.getItem('token'),
+    isAuthenticated: !!localStorage.getItem('token'),
   }),
 
   getters: {
-    isAuthenticated: (state) => !!state.token,
     isAdmin: (state) => state.user?.role === 'admin',
-    hasPermission: (state) => (permission: keyof User['permissions']) => {
-      return state.user?.permissions[permission] || state.user?.role === 'admin';
-    },
   },
 
   actions: {
-    setAuthHeader() {
-      if (this.token) {
-        axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
-      } else {
-        delete axios.defaults.headers.common['Authorization'];
-      }
-    },
-
-    async login(credentials: LoginCredentials) {
+    async login(credentials: { login: string; password: string }) {
       try {
-        console.log('Logging in to:', API_URL); // ← DEBUG
-        const response = await axios.post(`${API_URL}/auth/login`, credentials, {
-          withCredentials: true // ← WAŻNE dla CORS
-        });
+        console.log('Logging in to:', API_URL);
+        const response = await axios.post(`${API_URL}/auth/login`, credentials);
+        
         this.token = response.data.token;
         this.user = response.data.user;
-        localStorage.setItem('token', this.token!);
-        this.setAuthHeader();
+        this.isAuthenticated = true;
+        
+        localStorage.setItem('token', response.data.token);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+        
         return { success: true };
       } catch (error: any) {
-        console.error('Login error:', error); // ← DEBUG
-        return {
-          success: false,
-          error: error.response?.data?.error || 'Błąd logowania',
+        console.error('Login error:', error);
+        return { 
+          success: false, 
+          error: error.response?.data?.error || 'Błąd logowania' 
         };
       }
     },
 
-    async register(data: RegisterData) {
+    async register(userData: any) {
       try {
-        const response = await axios.post(`${API_URL}/auth/register`, data, {
-          withCredentials: true
-        });
+        const response = await axios.post(`${API_URL}/auth/register`, userData);
+        
         this.token = response.data.token;
         this.user = response.data.user;
-        localStorage.setItem('token', this.token!);
-        this.setAuthHeader();
+        this.isAuthenticated = true;
+        
+        localStorage.setItem('token', response.data.token);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+        
         return { success: true };
       } catch (error: any) {
-        return {
-          success: false,
-          error: error.response?.data?.error || 'Błąd rejestracji',
+        console.error('Register error:', error);
+        return { 
+          success: false, 
+          error: error.response?.data?.error || 'Błąd rejestracji' 
         };
       }
     },
 
     async fetchProfile() {
       try {
-        this.setAuthHeader();
-        const response = await axios.get(`${API_URL}/users/profile`, {
-          withCredentials: true
-        });
-        this.user = response.data;
-      } catch (error) {
-        this.logout();
-      }
-    },
-
-    async updateProfile(data: Partial<User>) {
-      try {
-        const response = await axios.put(`${API_URL}/users/profile`, data, {
-          withCredentials: true
-        });
+        const response = await axios.get(`${API_URL}/users/profile`);
         this.user = response.data;
         return { success: true };
       } catch (error: any) {
-        return {
-          success: false,
-          error: error.response?.data?.error || 'Błąd aktualizacji profilu',
+        console.error('Fetch profile error:', error);
+        return { 
+          success: false, 
+          error: error.response?.data?.error || 'Błąd pobierania profilu' 
+        };
+      }
+    },
+
+    async updateProfile(userData: any) {
+      try {
+        const response = await axios.put(`${API_URL}/users/profile`, userData);
+        this.user = response.data;
+        return { success: true };
+      } catch (error: any) {
+        console.error('Update profile error:', error);
+        return { 
+          success: false, 
+          error: error.response?.data?.error || 'Błąd aktualizacji profilu' 
         };
       }
     },
@@ -98,8 +95,34 @@ export const useAuthStore = defineStore('auth', {
     logout() {
       this.user = null;
       this.token = null;
+      this.isAuthenticated = false;
+      
       localStorage.removeItem('token');
       delete axios.defaults.headers.common['Authorization'];
+    },
+
+    async initializeAuth() {
+      const token = localStorage.getItem('token');
+      
+      if (token) {
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        
+        try {
+          const response = await axios.get(`${API_URL}/users/profile`);
+          this.user = response.data;
+          this.isAuthenticated = true;
+          this.token = token;
+        } catch (error) {
+          console.error('Auth initialization failed:', error);
+          this.logout();
+        }
+      }
+    },
+
+    hasPermission(permission: keyof User['permissions']): boolean {
+      if (!this.user) return false;
+      if (this.user.role === 'admin') return true;
+      return this.user.permissions[permission] === true;
     },
   },
 });
