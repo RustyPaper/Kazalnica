@@ -33,7 +33,7 @@
             </div>
             
             <div class="form-group">
-              <label>Wysokość udziałów w częściach wspólnych lokalu {{ index + 1 }}</label>
+              <label>Wysokość udziałów w częściach wspólnych lokalu {{ index + 1 }} (Znajduje się w Akcie notarnialnym w &1 pkt 1)</label>
               <input type="text" v-model="apartment.shareAmount" placeholder="np. 250.50" />
             </div>
             

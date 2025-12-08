@@ -1,17 +1,18 @@
 import express, { Response } from 'express';
 import { AuthRequest, User, Apartment } from '../types';
-import { readJSON } from '../utils/fileStorage';
+import { getAllUsers } from '../utils/databaseStorage';
+import { getSetting } from '../utils/databaseStorage';
 import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
 
 // Get apartments statistics
-router.get('/apartments', authenticateToken, (req: AuthRequest, res: Response) => {
+router.get('/apartments', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const users = readJSON<User[]>('users.json');
-    const settings = readJSON<{ totalSharesTarget: number }>('settings.json');
+    const users = await getAllUsers();
+    const settingsData = await getSetting('totalSharesTarget');
     
-    const totalSharesTarget = settings?.totalSharesTarget || 10000;
+    const totalSharesTarget = settingsData || 10000;
     
     // Zbierz wszystkie lokale ze wszystkich użytkowników
     const allApartments: Array<Apartment & { ownerName: string; ownerLogin: string }> = [];

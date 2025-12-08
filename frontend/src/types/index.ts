@@ -55,6 +55,12 @@ export interface SystemSettings {
   totalSharesTarget: number;
 }
 
+export interface Holiday {
+  date: string;
+  name: string;
+  isHighSeason?: boolean;
+}
+
 export interface ApartmentStatistics {
   totalSharesTarget: number;
   totalShares: number;

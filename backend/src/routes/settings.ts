@@ -1,44 +1,80 @@
 import express, { Response } from 'express';
-import { AuthRequest, SystemSettings } from '../types';
-import { readJSON, writeJSON } from '../utils/fileStorage';
+import { AuthRequest } from '../types';
+import { getSetting, setSetting } from '../utils/databaseStorage';
 import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
 
-// Get system settings
-router.get('/', authenticateToken, (req: AuthRequest, res: Response) => {
+// Get all settings (zwraca obiekt z wszystkimi ustawieniami)
+router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    let settings = readJSON<SystemSettings>('settings.json');
+    const totalSharesTarget = await getSetting('totalSharesTarget') || 10000;
     
-    if (!settings || typeof settings.totalSharesTarget === 'undefined') {
-      settings = { totalSharesTarget: 10000 };
-      writeJSON('settings.json', settings);
-    }
-    
-    res.json(settings);
+    res.json({
+      totalSharesTarget
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Błąd serwera' });
   }
 });
 
-// Update system settings (admin only)
-router.put('/', authenticateToken, (req: AuthRequest, res: Response) => {
-  if (req.user!.role !== 'admin') {
-    return res.status(403).json({ error: 'Tylko administrator może zmieniać ustawienia' });
-  }
-
+// Get setting
+router.get('/:key', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const { totalSharesTarget } = req.body;
-
-    if (typeof totalSharesTarget !== 'number' || totalSharesTarget <= 0) {
-      return res.status(400).json({ error: 'Nieprawidłowa wartość sumy udziałów' });
+    const { key } = req.params;
+    const value = await getSetting(key);
+    
+    if (value === null) {
+      return res.status(404).json({ error: 'Ustawienie nie znalezione' });
     }
 
-    const settings: SystemSettings = { totalSharesTarget };
-    writeJSON('settings.json', settings);
+    res.json({ key, value });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Błąd serwera' });
+  }
+});
 
-    res.json(settings);
+// Update settings (admin only)
+router.put('/', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user!.role !== 'admin') {
+      return res.status(403).json({ error: 'Brak uprawnień' });
+    }
+
+    const { totalSharesTarget } = req.body;
+
+    if (totalSharesTarget !== undefined) {
+      await setSetting('totalSharesTarget', totalSharesTarget);
+    }
+
+    res.json({ 
+      message: 'Ustawienia zaktualizowane',
+      totalSharesTarget 
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Błąd serwera' });
+  }
+});
+
+// Set setting (admin only) - legacy endpoint
+router.put('/:key', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user!.role !== 'admin') {
+      return res.status(403).json({ error: 'Brak uprawnień' });
+    }
+
+    const { key } = req.params;
+    const { value } = req.body;
+
+    if (value === undefined) {
+      return res.status(400).json({ error: 'Wartość jest wymagana' });
+    }
+
+    await setSetting(key, value);
+    res.json({ key, value });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Błąd serwera' });

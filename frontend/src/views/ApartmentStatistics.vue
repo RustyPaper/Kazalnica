@@ -194,11 +194,13 @@ const fetchStatistics = async () => {
 const fetchSettings = async () => {
   try {
     const response = await axios.get(`${API_URL}/settings`);
-    targetShares.value = response.data.totalSharesTarget;
+    targetShares.value = response.data.totalSharesTarget || 10000;
   } catch (err: any) {
     console.error('Błąd pobierania ustawień:', err);
+    targetShares.value = 10000; // Domyślna wartość
   }
 };
+
 
 const updateSettings = async () => {
   try {

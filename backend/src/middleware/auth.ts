@@ -1,11 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User, AuthRequest } from '../types';
-import { readJSON } from '../utils/fileStorage';
+import { getUserById } from '../utils/databaseStorage';
 
-const JWT_SECRET = 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -13,13 +13,11 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
     return res.status(401).json({ error: 'Token wymagany' });
   }
 
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) {
-      return res.status(403).json({ error: 'Nieprawidłowy token' });
-    }
-
-    const users = readJSON<User[]>('users.json');
-    const user = users.find(u => u.id === (decoded as any).userId);
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    
+    // Pobierz użytkownika z bazy danych
+    const user = await getUserById(decoded.id); // Zmienione z userId na id
 
     if (!user) {
       return res.status(403).json({ error: 'Użytkownik nie znaleziony' });
@@ -27,7 +25,9 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
 
     req.user = user;
     next();
-  });
+  } catch (err) {
+    return res.status(403).json({ error: 'Nieprawidłowy token' });
+  }
 };
 
 export const requirePermission = (permission: keyof User['permissions']) => {

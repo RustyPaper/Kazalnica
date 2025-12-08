@@ -22,6 +22,7 @@
         :class="{
           'other-month': !day.isCurrentMonth,
           'holiday': day.isHoliday,
+          'high-season': day.isHighSeason,
           'today': day.isToday
         }"
         @click="handleDayClick(day)"
@@ -51,6 +52,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Event, Holiday } from '../types';
+import { isHighSeasonComplete } from '../utils/dateHelpers';
 
 interface Props {
   currentMonth: number;
@@ -65,6 +67,7 @@ interface CalendarDay {
   isCurrentMonth: boolean;
   isToday: boolean;
   isHoliday: boolean;
+  isHighSeason: boolean;
   holidayName?: string;
   events: Event[];
 }
@@ -135,6 +138,7 @@ const createCalendarDay = (date: Date, isCurrentMonth: boolean): CalendarDay => 
     isCurrentMonth,
     isToday: date.getTime() === today.getTime(),
     isHoliday: !!holiday,
+    isHighSeason: isHighSeasonComplete(dateString),
     holidayName: holiday?.name,
     events: dayEvents,
   };
@@ -168,3 +172,169 @@ const handleEventClick = (event: Event) => {
   emit('event-click', event);
 };
 </script>
+
+<style scoped>
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 0 10px;
+}
+
+.calendar-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background-color: #e0e0e0;
+  border: 1px solid #e0e0e0;
+}
+
+.calendar-day-header {
+  background-color: #f5f5f5;
+  padding: 10px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+  color: #666;
+}
+
+.calendar-day {
+  background-color: white;
+  min-height: 100px;
+  padding: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  position: relative;
+}
+
+.calendar-day:hover {
+  background-color: #f8f9fa;
+}
+
+.calendar-day.other-month {
+  background-color: #fafafa;
+  opacity: 0.6;
+}
+
+.calendar-day.other-month:hover {
+  background-color: #f0f0f0;
+}
+
+.calendar-day.holiday {
+  background-color: #fff9e6;
+}
+
+.calendar-day.holiday:hover {
+  background-color: #fff3d9;
+}
+
+.calendar-day.high-season {
+  background-color: #ffe6e6;
+}
+
+.calendar-day.high-season:hover {
+  background-color: #ffd9d9;
+}
+
+/* Jeśli dzień jest zarówno świętem jak i sezonem wysokim */
+.calendar-day.holiday.high-season {
+  background: linear-gradient(135deg, #fff9e6 50%, #ffe6e6 50%);
+}
+
+.calendar-day.holiday.high-season:hover {
+  background: linear-gradient(135deg, #fff3d9 50%, #ffd9d9 50%);
+}
+
+.calendar-day.today {
+  border: 2px solid #007bff;
+}
+
+.calendar-day-number {
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 4px;
+  color: #333;
+}
+
+.calendar-day.other-month .calendar-day-number {
+  color: #999;
+}
+
+.holiday-name {
+  font-size: 11px;
+  color: #d97706;
+  font-weight: 500;
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+
+.calendar-events {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.calendar-event {
+  background-color: #007bff;
+  color: white;
+  padding: 4px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-event:hover {
+  background-color: #0056b3;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background-color: #5a6268;
+}
+
+@media (max-width: 768px) {
+  .calendar-day {
+    min-height: 80px;
+    padding: 4px;
+  }
+
+  .calendar-day-number {
+    font-size: 14px;
+  }
+
+  .holiday-name {
+    font-size: 9px;
+  }
+
+  .calendar-event {
+    font-size: 10px;
+    padding: 2px 4px;
+  }
+}
+</style>
+

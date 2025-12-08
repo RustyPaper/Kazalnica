@@ -8,6 +8,8 @@ import eventsRoutes from './routes/events';
 import permissionsRoutes from './routes/permissions';
 import settingsRoutes from './routes/settings';
 import statisticsRoutes from './routes/statistics';
+// NOWE:
+import { initDatabase } from './utils/initDatabase';
 
 dotenv.config();
 
@@ -42,19 +44,35 @@ app.get('/api/health', (req, res) => {
     status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    cors: FRONTEND_URL
+    cors: FRONTEND_URL,
+    database: 'PostgreSQL'
   });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`
+// Initialize database and start server
+const startServer = async () => {
+  try {
+    // Initialize database tables
+    await initDatabase();
+    
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`
 ╔════════════════════════════════════════════════════════╗
 ║  Kalendarz Apartamentów - Server                       ║
 ╠════════════════════════════════════════════════════════╣
 ║  Status: Running                                       ║
 ║  Port: ${PORT}                                         ║
 ║  Frontend: ${FRONTEND_URL}                             ║
+║  Database: PostgreSQL                                  ║
 ║  Environment: ${process.env.NODE_ENV || 'development'} ║
 ╚════════════════════════════════════════════════════════╝
-  `);
-});
+      `);
+    });
+  } catch (error) {
+    console.error('❌ Nie udało się uruchomić serwera:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
+
