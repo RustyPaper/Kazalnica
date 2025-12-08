@@ -15,9 +15,11 @@ const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-// CORS
+console.log('🌐 Configured CORS for:', FRONTEND_URL);
+
+// CORS - MUSI BYĆ PRZED ROUTES
 app.use(cors({
-  origin: [FRONTEND_URL, 'http://localhost:5173'],
+  origin: [FRONTEND_URL, 'http://localhost:5173', 'https://kazalnicaapp.onrender.com'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -40,6 +42,7 @@ app.get('/api/health', (req, res) => {
     status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    cors: FRONTEND_URL
   });
 });
 
@@ -50,6 +53,7 @@ app.listen(PORT, '0.0.0.0', () => {
 ╠════════════════════════════════════════════════════════╣
 ║  Status: Running                                       ║
 ║  Port: ${PORT}                                         ║
+║  Frontend: ${FRONTEND_URL}                             ║
 ║  Environment: ${process.env.NODE_ENV || 'development'} ║
 ╚════════════════════════════════════════════════════════╝
   `);
