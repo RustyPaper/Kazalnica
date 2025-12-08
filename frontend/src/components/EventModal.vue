@@ -16,9 +16,24 @@
         
         <div class="form-group">
           <label>
-            Numer Apartamentu <span class="required">*</span>
+            Apartament <span class="required">*</span>
           </label>
-          <input type="text" v-model="formData.apartmentNumber" required />
+          <select v-model="formData.apartmentNumber" required>
+            <option value="" disabled>Wybierz apartament</option>
+            <option 
+              v-for="apartment in userApartments" 
+              :key="apartment.number" 
+              :value="apartment.number"
+            >
+              {{ apartment.number }}
+              <template v-if="apartment.additionalInfo">
+                - {{ apartment.additionalInfo }}
+              </template>
+            </option>
+          </select>
+          <small v-if="userApartments.length === 0" class="text-muted">
+            Brak dostępnych apartamentów. Dodaj apartamenty w swoim profilu.
+          </small>
         </div>
         
         <div class="form-group">
@@ -29,7 +44,11 @@
         <div class="error" v-if="error">{{ error }}</div>
         
         <div style="display: flex; gap: 10px; margin-top: 20px;">
-          <button type="submit" class="btn btn-primary">
+          <button 
+            type="submit" 
+            class="btn btn-primary"
+            :disabled="userApartments.length === 0"
+          >
             {{ editingEvent ? 'Zapisz' : 'Dodaj' }}
           </button>
           <button type="button" class="btn btn-secondary" @click="$emit('close')">
@@ -42,7 +61,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
+import { useAuthStore } from '../stores/auth';
 import type { Event } from '../types';
 
 interface Props {
@@ -56,6 +76,8 @@ const emit = defineEmits<{
   save: [event: Partial<Event>];
 }>();
 
+const authStore = useAuthStore();
+
 const formData = ref({
   date: '',
   apartmentNumber: '',
@@ -63,6 +85,11 @@ const formData = ref({
 });
 
 const error = ref('');
+
+// Pobierz apartamenty zalogowanego użytkownika
+const userApartments = computed(() => {
+  return authStore.user?.apartments || [];
+});
 
 onMounted(() => {
   if (props.editingEvent) {
@@ -84,9 +111,49 @@ const handleSubmit = () => {
     return;
   }
   
+  if (userApartments.value.length === 0) {
+    error.value = 'Brak dostępnych apartamentów';
+    return;
+  }
+  
   emit('save', {
     ...formData.value,
     id: props.editingEvent?.id,
   });
 };
 </script>
+
+<style scoped>
+select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: white;
+  cursor: pointer;
+}
+
+select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+select:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.text-muted {
+  color: #6c757d;
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+</style>
