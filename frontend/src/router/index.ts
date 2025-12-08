@@ -1,4 +1,4 @@
-import { createRouter, createWebHashHistory } from 'vue-router'; // ← ZMIANA
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import Login from '../views/Login.vue';
 import Register from '../views/Register.vue';
@@ -7,7 +7,7 @@ import Profile from '../views/Profile.vue';
 import Permissions from '../views/Permissions.vue';
 import ApartmentStatistics from '../views/ApartmentStatistics.vue';
 
-const routes = [
+const routes: RouteRecordRaw[] = [
   {
     path: '/',
     redirect: '/login',
@@ -51,7 +51,7 @@ const routes = [
 ];
 
 const router = createRouter({
-  history: createWebHashHistory(), // ← ZMIANA z createWebHistory()
+  history: createWebHistory(),
   routes,
 });
 
