@@ -3,22 +3,25 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
+  publicDir: 'public', // ✅ DODANE - Vite będzie kopiować pliki z public/ do dist/
+  build: {
+    outDir: 'dist',    // ✅ DODANE - folder wyjściowy
+  },
   server: {
-    host: true,          // udostępnia serwer na 0.0.0.0
-    port: 5173,          // jeden wspólny port
-    strictPort: false,   // jeśli 5173 zajęty, użyje kolejnego
+    host: true,
+    port: 5173,
+    strictPort: false,
 
     allowedHosts: [
-      '.ts.net',         // Tailscale Funnel
+      '.ts.net',
       'localhost'
     ],
 
     proxy: {
       '/api': {
-        target: 'http://localhost:3000', // Twój backend
+        target: 'http://localhost:3000',
         changeOrigin: true,
       }
     }
   }
 })
-
