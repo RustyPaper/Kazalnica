@@ -27,13 +27,22 @@
                 </span>
               </td>
               <td style="padding: 10px;">
-                <button
-                  class="btn btn-primary"
-                  @click="openPermissionsModal(user)"
-                  :disabled="user.id === authStore.user?.id"
-                >
-                  Edytuj uprawnienia
-                </button>
+                <div style="display: flex; gap: 8px;">
+                  <button
+                    class="btn btn-primary"
+                    @click="openPermissionsModal(user)"
+                    :disabled="user.id === authStore.user?.id"
+                  >
+                    Edytuj uprawnienia
+                  </button>
+                  <button
+                    class="btn btn-danger"
+                    @click="openDeleteModal(user)"
+                    :disabled="user.id === authStore.user?.id"
+                  >
+                    Usuń konto
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -42,7 +51,7 @@
     </div>
     
     <!-- Permissions Modal -->
-    <div v-if="selectedUser" class="modal-overlay" @click.self="closeModal">
+    <div v-if="selectedUser && !showDeleteConfirm" class="modal-overlay" @click.self="closeModal">
       <div class="modal">
         <div class="modal-header">
           <h3 class="modal-title">Uprawnienia: {{ selectedUser.login }}</h3>
@@ -99,6 +108,36 @@
         </div>
       </div>
     </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div v-if="showDeleteConfirm && userToDelete" class="modal-overlay" @click.self="closeDeleteModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3 class="modal-title">Potwierdź usunięcie</h3>
+          <button class="modal-close" @click="closeDeleteModal">&times;</button>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <p style="font-size: 16px; margin-bottom: 10px;">
+            Czy na pewno chcesz usunąć konto użytkownika <strong>{{ userToDelete.login }}</strong>?
+          </p>
+          <p style="color: #dc3545; font-size: 14px;">
+            Ta operacja jest nieodwracalna!
+          </p>
+        </div>
+        
+        <div class="error" v-if="error">{{ error }}</div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button class="btn btn-danger" @click="confirmDelete" :disabled="deleting">
+            {{ deleting ? 'Usuwanie...' : 'Tak' }}
+          </button>
+          <button class="btn btn-secondary" @click="closeDeleteModal" :disabled="deleting">
+            Nie
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -110,10 +149,10 @@ import type { User } from '../types';
 import { API_URL } from '../config';
 
 const authStore = useAuthStore();
-//const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const users = ref<User[]>([]);
 const selectedUser = ref<User | null>(null);
+const userToDelete = ref<User | null>(null);
 const editPermissions = ref({
   viewCalendar: false,
   addEvent: false,
@@ -123,6 +162,8 @@ const editPermissions = ref({
 const loading = ref(true);
 const error = ref('');
 const success = ref('');
+const showDeleteConfirm = ref(false);
+const deleting = ref(false);
 
 const fetchUsers = async () => {
   try {
@@ -147,6 +188,45 @@ const closeModal = () => {
   selectedUser.value = null;
   error.value = '';
   success.value = '';
+};
+
+const openDeleteModal = (user: User) => {
+  userToDelete.value = user;
+  showDeleteConfirm.value = true;
+  error.value = '';
+};
+
+const closeDeleteModal = () => {
+  userToDelete.value = null;
+  showDeleteConfirm.value = false;
+  error.value = '';
+};
+
+const confirmDelete = async () => {
+  if (!userToDelete.value) return;
+  
+  try {
+    deleting.value = true;
+    error.value = '';
+    
+    await axios.delete(`${API_URL}/users/${userToDelete.value.id}`);
+    
+    // Remove user from list
+    users.value = users.value.filter(u => u.id !== userToDelete.value!.id);
+    
+    closeDeleteModal();
+    
+    // Show success message
+    success.value = `Użytkownik ${userToDelete.value.login} został usunięty`;
+    setTimeout(() => {
+      success.value = '';
+    }, 3000);
+    
+  } catch (err: any) {
+    error.value = err.response?.data?.error || 'Błąd usuwania użytkownika';
+  } finally {
+    deleting.value = false;
+  }
 };
 
 const savePermissions = async () => {
@@ -211,5 +291,26 @@ onMounted(() => {
 .form-group input[type="checkbox"] {
   width: auto;
   cursor: pointer;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.btn-danger:disabled {
+  background-color: #e4606d;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 </style>

@@ -68,3 +68,38 @@ router.get('/all', authenticateToken, (req: AuthRequest, res: Response) => {
 });
 
 export default router;
+
+// Delete user (admin only)
+router.delete('/:userId', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user!.role !== 'admin') {
+      return res.status(403).json({ error: 'Brak uprawnień' });
+    }
+
+    const { userId } = req.params;
+
+    // Prevent admin from deleting themselves
+    if (userId === req.user!.id) {
+      return res.status(400).json({ error: 'Nie możesz usunąć własnego konta' });
+    }
+
+    const users = readJSON<User[]>('users.json');
+    const userIndex = users.findIndex(u => u.id === userId);
+
+    if (userIndex === -1) {
+      return res.status(404).json({ error: 'Użytkownik nie znaleziony' });
+    }
+
+    const deletedUser = users[userIndex];
+    users.splice(userIndex, 1);
+    writeJSON('users.json', users);
+
+    res.json({ 
+      message: 'Użytkownik został usunięty',
+      deletedUser: deletedUser.login
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Błąd serwera' });
+  }
+});
