@@ -4,7 +4,7 @@ export interface Holiday {
   isHighSeason?: boolean;
 }
 
-// Obliczanie Wielkanocy (algorytm Gaussa) - zwraca datę w UTC
+// Obliczanie Wielkanocy (algorytm Gaussa)
 const calculateEaster = (year: number): Date => {
   const a = year % 19;
   const b = Math.floor(year / 100);
@@ -21,11 +21,10 @@ const calculateEaster = (year: number): Date => {
   const month = Math.floor((h + l - 7 * m + 114) / 31);
   const day = ((h + l - 7 * m + 114) % 31) + 1;
 
-  // Tworzymy datę w UTC (południe, żeby uniknąć problemów ze strefami)
   return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
 };
 
-// Dodaj dni do daty UTC i zwróć string YYYY-MM-DD
+// Dodaj dni do daty i zwróć string YYYY-MM-DD
 const addDays = (date: Date, days: number): string => {
   const result = new Date(date.getTime());
   result.setUTCDate(result.getUTCDate() + days);
@@ -37,11 +36,15 @@ const addDays = (date: Date, days: number): string => {
   return `${year}-${month}-${day}`;
 };
 
-// Formatuj datę UTC do YYYY-MM-DD
+// Formatuj datę do YYYY-MM-DD z KOREKCJĄ -1 dzień
 const formatDate = (date: Date): string => {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
+  // HARDCODED: odejmij 1 dzień
+  const corrected = new Date(date.getTime());
+  corrected.setUTCDate(corrected.getUTCDate() - 1);
+  
+  const year = corrected.getUTCFullYear();
+  const month = String(corrected.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(corrected.getUTCDate()).padStart(2, '0');
   
   return `${year}-${month}-${day}`;
 };
@@ -60,61 +63,60 @@ export const getPolishHolidays = (year: number): Holiday[] => {
     { date: `${year}-12-26`, name: 'Drugi dzień Bożego Narodzenia' },
   ];
 
-  // Wielkanoc i święta ruchome
+  // Wielkanoc i święta ruchome (z korektą -1 dzień w formatDate)
   const easter = calculateEaster(year);
   
-  // Wielki Piątek (2 dni przed Wielkanocą)
+  // Wielki Piątek (3 dni przed Wielkanocą, bo formatDate odejmuje 1)
   holidays.push({
-    date: addDays(easter, -2),
+    date: addDays(easter, -3),
     name: 'Wielki Piątek',
     isHighSeason: true
   });
 
-  // Wielka Sobota (1 dzień przed Wielkanocą)
+  // Wielka Sobota (2 dni przed Wielkanocą)
   holidays.push({
-    date: addDays(easter, -1),
+    date: addDays(easter, -2),
     name: 'Wielka Sobota',
     isHighSeason: true
   });
 
-  // Niedziela Wielkanocna
+  // Niedziela Wielkanocna (używamy formatDate który odejmuje 1)
   holidays.push({
     date: formatDate(easter),
     name: 'Wielkanoc',
     isHighSeason: true
   });
 
-  // Poniedziałek Wielkanocny
+  // Poniedziałek Wielkanocny (bez korekty bo addDays jest OK)
   holidays.push({
-    date: addDays(easter, 1),
+    date: addDays(easter, 0), // było +1, teraz 0 bo formatDate odejmuje
     name: 'Poniedziałek Wielkanocny',
     isHighSeason: true
   });
 
-  // Zielone Świątki (49 dni po Wielkanocy)
+  // Zielone Świątki (48 dni, bo formatDate odejmuje 1)
   holidays.push({
-    date: addDays(easter, 49),
+    date: addDays(easter, 48),
     name: 'Zielone Świątki'
   });
 
-  // Boże Ciało (60 dni po Wielkanocy)
-  const corpusChristiDate = addDays(easter, 60);
+  // Boże Ciało (59 dni, bo formatDate odejmuje 1)
   holidays.push({
-    date: corpusChristiDate,
+    date: addDays(easter, 59),
     name: 'Boże Ciało',
     isHighSeason: true
   });
 
   // Dzień przed Bożym Ciałem
   holidays.push({
-    date: addDays(easter, 59),
+    date: addDays(easter, 58),
     name: 'Dzień przed Bożym Ciałem',
     isHighSeason: true
   });
 
   // Dzień po Bożym Ciele
   holidays.push({
-    date: addDays(easter, 61),
+    date: addDays(easter, 60),
     name: 'Dzień po Bożym Ciele',
     isHighSeason: true
   });
@@ -163,10 +165,9 @@ export const getPolishHolidays = (year: number): Holiday[] => {
 
 // Sprawdza czy data jest w sezonie wysokim
 export const isHighSeason = (dateString: string): boolean => {
-  // Parsuj datę jako YYYY-MM-DD (UTC)
   const [yearStr, monthStr, dayStr] = dateString.split('-');
   const year = parseInt(yearStr);
-  const month = parseInt(monthStr); // 1-12
+  const month = parseInt(monthStr);
   const day = parseInt(dayStr);
 
   // 1 lipiec - 15 sierpień
@@ -187,7 +188,6 @@ export const isHighSeason = (dateString: string): boolean => {
     return true;
   }
 
-  // Sprawdź święta oznaczone jako sezon wysoki
   const holidays = getPolishHolidays(year);
   const holiday = holidays.find(h => h.date === dateString && h.isHighSeason);
   
