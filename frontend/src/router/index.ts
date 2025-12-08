@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHashHistory } from 'vue-router'; // ← ZMIANA
 import { useAuthStore } from '../stores/auth';
 import Login from '../views/Login.vue';
 import Register from '../views/Register.vue';
@@ -51,7 +51,7 @@ const routes = [
 ];
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHashHistory(), // ← ZMIANA z createWebHistory()
   routes,
 });
 
