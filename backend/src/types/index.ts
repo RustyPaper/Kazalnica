@@ -4,7 +4,7 @@ export interface Apartment {
   number: string;
   shareAmount?: string;
   additionalInfo?: string;
-  status?: 'lease_agreement' | 'notice_sent' | 'collection_date' | 'collected';
+  status?: 'lease_agreement' | 'notice_sent' | 'collection_date' | 'collected' | 'smr';
   collectionDate?: string;
 }
 
@@ -51,7 +51,7 @@ export interface PublicApartment {
   phoneNumber?: string;
   email?: string;
   shareAmount?: string;
-  status?: 'lease_agreement' | 'notice_sent' | 'collection_date' | 'collected';
+  status?: 'lease_agreement' | 'notice_sent' | 'collection_date' | 'collected' | 'smr';
   collectionDate?: string;
   additionalInfo?: string;
   createdAt: string;
@@ -62,7 +62,7 @@ export interface ApartmentStats {
   number: string;
   shareAmount?: string;
   additionalInfo?: string;
-  status?: 'lease_agreement' | 'notice_sent' | 'collection_date' | 'collected';
+  status?: 'lease_agreement' | 'notice_sent' | 'collection_date' | 'collected' | 'smr';
   collectionDate?: string;
   ownerName: string;
   ownerLogin: string | null;

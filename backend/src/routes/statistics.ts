@@ -67,6 +67,7 @@ router.get('/apartments', async (req: Request, res: Response) => {
       notice_sent: allApartments.filter(apt => apt.status === 'notice_sent'),
       collection_date: allApartments.filter(apt => apt.status === 'collection_date'),
       collected: allApartments.filter(apt => apt.status === 'collected'),
+      smr: allApartments.filter(apt => apt.status === 'smr'),
       no_status: allApartments.filter(apt => !apt.status)
     };
 
@@ -88,6 +89,7 @@ router.get('/apartments', async (req: Request, res: Response) => {
         notice_sent: statusGroups.notice_sent.length,
         collection_date: statusGroups.collection_date.length,
         collected: statusGroups.collected.length,
+        smr: statusGroups.smr.length,
         no_status: statusGroups.no_status.length
       },
       sourceCounts
