@@ -84,41 +84,77 @@
         <div class="card" style="margin-top: 20px;">
           <h3 style="margin-bottom: 15px;">Rozkład według statusu</h3>
           <div class="status-grid">
-            <div class="status-card">
+            <div class="status-card" @click="filterByStatus('lease_agreement')" style="cursor: pointer;">
               <div class="status-icon">📄</div>
               <div class="status-count">{{ statistics.statusCounts.lease_agreement }}</div>
               <div class="status-label">Umowa dzierżawy</div>
+              <div class="status-percentage">{{ getStatusPercentage('lease_agreement') }}%</div>
+              <div class="status-shares">{{ formatNumber(getStatusShares('lease_agreement')) }} udziałów</div>
             </div>
             
-            <div class="status-card">
+            <div class="status-card" @click="filterByStatus('notice_sent')" style="cursor: pointer;">
               <div class="status-icon">📧</div>
               <div class="status-count">{{ statistics.statusCounts.notice_sent }}</div>
               <div class="status-label">Wysłane wezwanie</div>
+              <div class="status-percentage">{{ getStatusPercentage('notice_sent') }}%</div>
+              <div class="status-shares">{{ formatNumber(getStatusShares('notice_sent')) }} udziałów</div>
             </div>
             
-            <div class="status-card">
+            <div class="status-card" @click="filterByStatus('collection_date')" style="cursor: pointer;">
               <div class="status-icon">📅</div>
               <div class="status-count">{{ statistics.statusCounts.collection_date }}</div>
               <div class="status-label">Planowany odbiór</div>
+              <div class="status-percentage">{{ getStatusPercentage('collection_date') }}%</div>
+              <div class="status-shares">{{ formatNumber(getStatusShares('collection_date')) }} udziałów</div>
             </div>
             
-            <div class="status-card">
+            <div class="status-card" @click="filterByStatus('collected')" style="cursor: pointer;">
               <div class="status-icon">✅</div>
               <div class="status-count">{{ statistics.statusCounts.collected }}</div>
               <div class="status-label">Odebrane</div>
+              <div class="status-percentage">{{ getStatusPercentage('collected') }}%</div>
+              <div class="status-shares">{{ formatNumber(getStatusShares('collected')) }} udziałów</div>
             </div>
             
-            <div class="status-card">
+            <div class="status-card" @click="filterByStatus('no_status')" style="cursor: pointer;">
               <div class="status-icon">❔</div>
               <div class="status-count">{{ statistics.statusCounts.no_status }}</div>
               <div class="status-label">Bez statusu</div>
+              <div class="status-percentage">{{ getStatusPercentage('no_status') }}%</div>
+              <div class="status-shares">{{ formatNumber(getStatusShares('no_status')) }} udziałów</div>
             </div>
           </div>
         </div>
         
         <!-- Detailed Apartment List -->
         <div class="card" style="margin-top: 20px;">
-          <h3 style="margin-bottom: 15px;">Szczegółowa lista lokali</h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+            <h3 style="margin: 0;">Szczegółowa lista lokali</h3>
+            
+            <!-- Filter -->
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <select v-model="selectedStatusFilter" class="status-filter">
+                <option value="">Wszystkie statusy</option>
+                <option value="lease_agreement">Umowa dzierżawy</option>
+                <option value="notice_sent">Wysłane wezwanie</option>
+                <option value="collection_date">Planowany odbiór</option>
+                <option value="collected">Odebrane</option>
+                <option value="no_status">Bez statusu</option>
+              </select>
+              <button 
+                v-if="selectedStatusFilter" 
+                @click="clearFilter" 
+                class="btn-clear-filter"
+                title="Wyczyść filtr"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+          
+          <button class="btn btn-success" style="margin-bottom: 15px;" @click="showAddModal = true">
+            ➕ Dodaj lokal
+          </button>
           
           <div class="table-container">
             <table class="apartments-table">
@@ -129,10 +165,12 @@
                   <th>Udziały</th>
                   <th>Status</th>
                   <th>Data odbioru</th>
+                  <th>Źródło</th>
+                  <th style="width: 80px;"></th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(apt, index) in statistics.apartments" :key="index">
+                <tr v-for="(apt, index) in filteredApartments" :key="index">
                   <td>{{ apt.number }}</td>
                   <td>{{ apt.ownerName }}</td>
                   <td class="shares-cell">{{ formatNumber(parseFloat(apt.shareAmount || '0')) }}</td>
@@ -142,16 +180,33 @@
                     </span>
                   </td>
                   <td>{{ apt.collectionDate || '-' }}</td>
+                  <td>
+                    <span :class="apt.source === 'public' ? 'badge-public' : 'badge-user'">
+                      {{ apt.source === 'public' ? 'Publiczny' : 'Użytkownik' }}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      v-if="apt.source === 'public' && canEditPublic"
+                      class="btn-edit"
+                      @click="editApartment(apt)">
+                      Edytuj
+                    </button>
+                  </td>
                 </tr>
               </tbody>
               <tfoot>
                 <tr class="total-row">
-                  <td colspan="2"><strong>SUMA</strong></td>
-                  <td class="shares-cell"><strong>{{ formatNumber(statistics.totalShares) }}</strong></td>
-                  <td colspan="2"></td>
+                  <td colspan="2"><strong>SUMA {{ selectedStatusFilter ? '(filtrowane)' : '' }}</strong></td>
+                  <td class="shares-cell"><strong>{{ formatNumber(filteredTotalShares) }}</strong></td>
+                  <td colspan="4"></td>
                 </tr>
               </tfoot>
             </table>
+          </div>
+          
+          <div v-if="filteredApartments.length === 0" style="text-align: center; padding: 40px; color: #666;">
+            Brak lokali pasujących do wybranego filtru
           </div>
         </div>
       </div>
@@ -159,24 +214,32 @@
       <div v-if="error" class="error" style="margin-top: 20px;">{{ error }}</div>
       <div v-if="success" class="success" style="margin-top: 20px;">{{ success }}</div>
     </div>
+    
+    <AddApartmentModal
+      v-if="showAddModal"
+      @added="onApartmentAdded"
+      @close="showAddModal = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
-import type { ApartmentStatistics } from '../types';
 import { API_URL } from '../config';
+import AddApartmentModal from '../components/AddApartmentModal.vue';
 
 const authStore = useAuthStore();
-//const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
-const statistics = ref<ApartmentStatistics | null>(null);
+const statistics = ref<any | null>(null);
 const targetShares = ref(10000);
 const loading = ref(true);
 const error = ref('');
 const success = ref('');
+const showAddModal = ref(false);
+const canEditPublic = ref(true);
+const selectedStatusFilter = ref('');
 
 const fetchStatistics = async () => {
   try {
@@ -197,16 +260,15 @@ const fetchSettings = async () => {
     targetShares.value = response.data.totalSharesTarget || 10000;
   } catch (err: any) {
     console.error('Błąd pobierania ustawień:', err);
-    targetShares.value = 10000; // Domyślna wartość
+    targetShares.value = 10000;
   }
 };
-
 
 const updateSettings = async () => {
   try {
     error.value = '';
     success.value = '';
-        await axios.put(`${API_URL}/settings`, {
+    await axios.put(`${API_URL}/settings`, {
       totalSharesTarget: targetShares.value
     });
     
@@ -233,6 +295,61 @@ const getStatusLabel = (status?: string): string => {
     'collected': 'Odebrane',
   };
   return labels[status || ''] || 'Bez statusu';
+};
+
+const getStatusShares = (status: string): number => {
+  if (!statistics.value) return 0;
+  const groupKey = status === 'no_status' ? 'no_status' : status;
+  const group = statistics.value.statusGroups[groupKey] || [];
+  return group.reduce((sum: number, apt: any) => {
+    return sum + parseFloat(apt.shareAmount || '0');
+  }, 0);
+};
+
+const getStatusPercentage = (status: string): string => {
+  if (!statistics.value) return '0.00';
+  const shares = getStatusShares(status);
+  const percentage = (shares / statistics.value.totalSharesTarget) * 100;
+  return percentage.toFixed(2);
+};
+
+const filterByStatus = (status: string) => {
+  selectedStatusFilter.value = status === 'no_status' ? '' : status;
+  if (status === 'no_status') {
+    selectedStatusFilter.value = 'no_status';
+  }
+};
+
+const clearFilter = () => {
+  selectedStatusFilter.value = '';
+};
+
+const filteredApartments = computed(() => {
+  if (!statistics.value) return [];
+  if (!selectedStatusFilter.value) return statistics.value.apartments;
+  
+  if (selectedStatusFilter.value === 'no_status') {
+    return statistics.value.apartments.filter((apt: any) => !apt.status);
+  }
+  
+  return statistics.value.apartments.filter((apt: any) => apt.status === selectedStatusFilter.value);
+});
+
+const filteredTotalShares =
+computed(() => {
+  return filteredApartments.value.reduce((sum: number, apt: any) => {
+    return sum + parseFloat(apt.shareAmount || '0');
+  }, 0);
+});
+
+const onApartmentAdded = () => {
+  fetchStatistics();
+  showAddModal.value = false;
+};
+
+const editApartment = (apt: any) => {
+  console.log('Edycja lokalu:', apt);
+  // TODO: Implementacja edycji
 };
 
 onMounted(async () => {
@@ -329,6 +446,14 @@ onMounted(async () => {
   background: #f8f9fa;
   border-radius: 8px;
   border: 2px solid #dee2e6;
+  transition: all 0.2s;
+}
+
+.status-card:hover {
+  background: #e9ecef;
+  border-color: #667eea;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
 .status-icon {
@@ -346,6 +471,53 @@ onMounted(async () => {
 .status-label {
   font-size: 13px;
   color: #666;
+  margin-bottom: 8px;
+}
+
+.status-percentage {
+  font-size: 16px;
+  font-weight: 600;
+  color: #667eea;
+  margin-bottom: 4px;
+}
+
+.status-shares {
+  font-size: 12px;
+  color: #888;
+}
+
+.status-filter {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+}
+
+.status-filter:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.btn-clear-filter {
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.btn-clear-filter:hover {
+  background: #c82333;
 }
 
 .table-container {
@@ -422,6 +594,56 @@ onMounted(async () => {
   border-bottom: 2px solid #333;
 }
 
+.badge-public {
+  background: #ffe5e5;
+  color: #c41e3a;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-user {
+  background: #e0f7fa;
+  color: #00796b;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.btn-edit {
+  background: #ffc107;
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.btn-edit:hover {
+  background: #ffb300;
+}
+
+.btn-success {
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.btn-success:hover {
+  background: #218838;
+}
+
 @media (max-width: 768px) {
   .stats-grid {
     grid-template-columns: 1fr;
@@ -440,7 +662,7 @@ onMounted(async () => {
     padding: 8px;
   }
 }
-/* Mobile responsive */
+
 @media (max-width: 1024px) {
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -482,7 +704,7 @@ onMounted(async () => {
   }
 
   .apartments-table {
-    min-width: 600px;
+    min-width: 700px;
   }
 
   .apartments-table th,
@@ -493,6 +715,11 @@ onMounted(async () => {
 
   .shares-cell {
     font-size: 13px;
+  }
+  
+  .btn-edit {
+    padding: 4px 8px;
+    font-size: 12px;
   }
 }
 
@@ -543,6 +770,16 @@ onMounted(async () => {
   .apartments-table td {
     padding: 6px 4px;
   }
+  
+  .badge-public,
+  .badge-user {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+  
+  .btn-success {
+    width: 100%;
+    margin-bottom: 10px;
+  }
 }
 </style>
-

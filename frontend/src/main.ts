@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import { createPinia } from 'pinia'
+import { useAuthStore } from './stores/auth'
 import axios from 'axios'
 import './style.css'
 
@@ -26,10 +27,18 @@ axios.interceptors.response.use(
   (error) => {
     console.error('📥 Response error:', error.response?.status, error.config?.url);
     
+    // POPRAWKA: Nie przekierowuj automatycznie na /login dla publicznych stron
     if (error.response?.status === 401) {
       console.warn('🚫 401 Unauthorized - clearing auth');
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      
+      // Sprawdź czy jesteś na stronie wymagającej autoryzacji
+      const currentPath = window.location.pathname;
+      const publicPaths = ['/', '/login', '/register', '/statistics'];
+      
+      if (!publicPaths.includes(currentPath)) {
+        window.location.href = '/login';
+      }
     }
     
     return Promise.reject(error);
@@ -41,4 +50,9 @@ const pinia = createPinia()
 
 app.use(pinia)
 app.use(router)
+
+// NOWE: Inicjalizacja autoryzacji po załadowaniu Pinia
+const authStore = useAuthStore()
+authStore.initializeAuth()
+
 app.mount('#app')

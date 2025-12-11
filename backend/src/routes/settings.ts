@@ -1,12 +1,12 @@
-import express, { Response } from 'express';
+import express, { Response, Request } from 'express';
 import { AuthRequest } from '../types';
 import { getSetting, setSetting } from '../utils/databaseStorage';
 import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
 
-// Get all settings (zwraca obiekt z wszystkimi ustawieniami)
-router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
+// Get all settings - PUBLICZNE (bez authenticateToken)
+router.get('/', async (req: Request, res: Response) => {
   try {
     const totalSharesTarget = await getSetting('totalSharesTarget') || 10000;
     
@@ -19,8 +19,8 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Get setting
-router.get('/:key', authenticateToken, async (req: AuthRequest, res: Response) => {
+// Get setting - PUBLICZNE
+router.get('/:key', async (req: Request, res: Response) => {
   try {
     const { key } = req.params;
     const value = await getSetting(key);
@@ -36,7 +36,7 @@ router.get('/:key', authenticateToken, async (req: AuthRequest, res: Response) =
   }
 });
 
-// Update settings (admin only)
+// Update settings (admin only) - CHRONIONE
 router.put('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     if (req.user!.role !== 'admin') {
@@ -59,7 +59,7 @@ router.put('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Set setting (admin only) - legacy endpoint
+// Set setting (admin only) - CHRONIONE
 router.put('/:key', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     if (req.user!.role !== 'admin') {

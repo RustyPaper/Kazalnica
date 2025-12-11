@@ -1,32 +1,55 @@
-import express, { Response } from 'express';
-import { AuthRequest, User, Apartment } from '../types';
-import { getAllUsers } from '../utils/databaseStorage';
-import { getSetting } from '../utils/databaseStorage';
+import express, { Response, Request } from 'express';
+import { AuthRequest, ApartmentStats } from '../types';
+import { getAllUsers, getSetting } from '../utils/databaseStorage';
+import { getAllPublicApartments } from '../utils/publicApartmentsStorage';
 import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
 
-// Get apartments statistics
-router.get('/apartments', authenticateToken, async (req: AuthRequest, res: Response) => {
+// Get apartments statistics - PUBLICZNE (bez authenticateToken)
+router.get('/apartments', async (req: Request, res: Response) => {
   try {
     const users = await getAllUsers();
     const settingsData = await getSetting('totalSharesTarget');
-    
     const totalSharesTarget = settingsData || 10000;
-    
-    // Zbierz wszystkie lokale ze wszystkich użytkowników
-    const allApartments: Array<Apartment & { ownerName: string; ownerLogin: string }> = [];
-    
+
+    // Zbierz wszystkie lokale użytkowników
+    const allApartments: ApartmentStats[] = [];
+
     users.forEach(user => {
       user.apartments.forEach(apt => {
         allApartments.push({
-          ...apt,
+          number: apt.number,
+          shareAmount: apt.shareAmount,
+          additionalInfo: apt.additionalInfo,
+          status: apt.status,
+          collectionDate: apt.collectionDate,
           ownerName: `${user.firstName} ${user.lastName || ''}`.trim(),
-          ownerLogin: user.login
+          ownerLogin: user.login,
+          source: "user",
+          phoneNumber: user.phoneNumber,
+          email: user.email
         });
       });
     });
-    
+
+    // Zbierz publiczne lokale
+    const publicApartments = await getAllPublicApartments();
+    publicApartments.forEach(apt => {
+      allApartments.push({
+        number: apt.apartmentNumber,
+        shareAmount: apt.shareAmount,
+        additionalInfo: apt.additionalInfo,
+        status: apt.status,
+        collectionDate: apt.collectionDate,
+        ownerName: `${apt.ownerFirstName ?? ''} ${apt.ownerLastName ?? ''}`.trim(),
+        ownerLogin: null,
+        source: "public",
+        phoneNumber: apt.phoneNumber,
+        email: apt.email
+      });
+    });
+
     // Oblicz sumę udziałów
     let totalShares = 0;
     allApartments.forEach(apt => {
@@ -35,7 +58,7 @@ router.get('/apartments', authenticateToken, async (req: AuthRequest, res: Respo
         totalShares += shareAmount;
       }
     });
-    
+
     // Grupuj według statusu
     const statusGroups = {
       lease_agreement: allApartments.filter(apt => apt.status === 'lease_agreement'),
@@ -44,7 +67,13 @@ router.get('/apartments', authenticateToken, async (req: AuthRequest, res: Respo
       collected: allApartments.filter(apt => apt.status === 'collected'),
       no_status: allApartments.filter(apt => !apt.status)
     };
-    
+
+    // Dolicz, ile z każdego źródła
+    const sourceCounts = {
+      user: allApartments.filter(apt => apt.source === 'user').length,
+      public: allApartments.filter(apt => apt.source === 'public').length
+    };
+
     res.json({
       totalSharesTarget,
       totalShares,
@@ -58,8 +87,10 @@ router.get('/apartments', authenticateToken, async (req: AuthRequest, res: Respo
         collection_date: statusGroups.collection_date.length,
         collected: statusGroups.collected.length,
         no_status: statusGroups.no_status.length
-      }
+      },
+      sourceCounts
     });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Błąd serwera' });

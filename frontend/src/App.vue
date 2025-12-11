@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <nav class="navbar" v-if="authStore.isAuthenticated">
+    <nav class="navbar">
       <div class="navbar-content">
         <div class="navbar-title">Kalendarz Apartamentów</div>
         
@@ -14,7 +14,7 @@
         <!-- Menu -->
         <ul class="navbar-menu" :class="{ open: menuOpen }">
           <li>
-            <router-link to="/calendar" :class="{ active: $route.path === '/calendar' }" @click="closeMenu">
+            <router-link to="/" :class="{ active: $route.path === '/' }" @click="closeMenu">
               📅 Kalendarz
             </router-link>
           </li>
@@ -23,19 +23,37 @@
               📊 Statystyki
             </router-link>
           </li>
-          <li>
-            <router-link to="/profile" :class="{ active: $route.path === '/profile' }" @click="closeMenu">
-              👤 Profil
-            </router-link>
-          </li>
-          <li v-if="authStore.isAdmin">
-            <router-link to="/permissions" :class="{ active: $route.path === '/permissions' }" @click="closeMenu">
-              🔐 Uprawnienia
-            </router-link>
-          </li>
-          <li>
-            <a href="#" @click.prevent="logout">🚪 Wyloguj</a>
-          </li>
+          
+          <!-- Dla niezalogowanych użytkowników -->
+          <template v-if="!authStore.isAuthenticated">
+            <li>
+              <router-link to="/login" :class="{ active: $route.path === '/login' }" @click="closeMenu" class="btn-login">
+                🔑 Zaloguj
+              </router-link>
+            </li>
+            <li>
+              <router-link to="/register" :class="{ active: $route.path === '/register' }" @click="closeMenu">
+                ✍️ Zarejestruj
+              </router-link>
+            </li>
+          </template>
+          
+          <!-- Dla zalogowanych użytkowników -->
+          <template v-else>
+            <li>
+              <router-link to="/profile" :class="{ active: $route.path === '/profile' }" @click="closeMenu">
+                👤 Profil
+              </router-link>
+            </li>
+            <li v-if="authStore.isAdmin">
+              <router-link to="/permissions" :class="{ active: $route.path === '/permissions' }" @click="closeMenu">
+                🔐 Uprawnienia
+              </router-link>
+            </li>
+            <li>
+              <a href="#" @click.prevent="logout">🚪 Wyloguj</a>
+            </li>
+          </template>
         </ul>
       </div>
     </nav>
@@ -62,7 +80,7 @@ const closeMenu = () => {
 
 const logout = () => {
   authStore.logout();
-  router.push('/login');
+  router.push('/');
   closeMenu();
 };
 </script>
@@ -146,6 +164,16 @@ const logout = () => {
 
 .navbar-menu a.active {
   background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Wyróżnienie przycisku logowania */
+.btn-login {
+  background-color: #28a745 !important;
+  font-weight: 600;
+}
+
+.btn-login:hover {
+  background-color: #218838 !important;
 }
 
 /* Mobile styles */

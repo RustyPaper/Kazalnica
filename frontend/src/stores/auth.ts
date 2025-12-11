@@ -65,12 +65,19 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async fetchProfile() {
+      // POPRAWKA: Nie wywołuj jeśli nie ma tokenu
+      if (!this.token) {
+        return { success: false, error: 'Brak tokenu' };
+      }
+
       try {
         const response = await axios.get(`${API_URL}/users/profile`);
         this.user = response.data;
         return { success: true };
       } catch (error: any) {
         console.error('Fetch profile error:', error);
+        // POPRAWKA: Wyloguj jeśli token nieprawidłowy
+        this.logout();
         return { 
           success: false, 
           error: error.response?.data?.error || 'Błąd pobierania profilu' 
@@ -101,21 +108,16 @@ export const useAuthStore = defineStore('auth', {
       delete axios.defaults.headers.common['Authorization'];
     },
 
-    async initializeAuth() {
+    // POPRAWKA: Usuń automatyczne wywołanie przy inicjalizacji
+    // Router zadecyduje, kiedy pobrać profil
+    initializeAuth() {
       const token = localStorage.getItem('token');
       
       if (token) {
+        this.token = token;
+        this.isAuthenticated = true;
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        
-        try {
-          const response = await axios.get(`${API_URL}/users/profile`);
-          this.user = response.data;
-          this.isAuthenticated = true;
-          this.token = token;
-        } catch (error) {
-          console.error('Auth initialization failed:', error);
-          this.logout();
-        }
+        // NIE wywołuj fetchProfile tutaj - router to zrobi gdy będzie potrzebne
       }
     },
 

@@ -45,6 +45,27 @@ export const initDatabase = async () => {
       );
     `);
 
+        // Tabela publicznych lokali (zgłoszenia anonimowe)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public_apartments (
+        id SERIAL PRIMARY KEY,
+        apartment_number VARCHAR(20) NOT NULL,
+        owner_first_name VARCHAR(100),
+        owner_last_name VARCHAR(100),
+        phone_number VARCHAR(20),
+        email VARCHAR(100),
+        share_amount VARCHAR(20),
+        status VARCHAR(20),
+        collection_date VARCHAR(20),
+        additional_info TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_public_apartments_number ON public_apartments(apartment_number);
+    `);
+
     // Indeksy dla lepszej wydajności
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_events_date ON events(date);

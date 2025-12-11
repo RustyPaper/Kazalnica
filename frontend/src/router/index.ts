@@ -10,7 +10,9 @@ import ApartmentStatistics from '../views/ApartmentStatistics.vue';
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/login',
+    name: 'Calendar',
+    component: Calendar,
+    meta: { requiresAuth: false }, // Publiczny dostęp
   },
   {
     path: '/login',
@@ -23,12 +25,6 @@ const routes: RouteRecordRaw[] = [
     name: 'Register',
     component: Register,
     meta: { requiresGuest: true },
-  },
-  {
-    path: '/calendar',
-    name: 'Calendar',
-    component: Calendar,
-    meta: { requiresAuth: true },
   },
   {
     path: '/profile',
@@ -46,7 +42,7 @@ const routes: RouteRecordRaw[] = [
     path: '/statistics',
     name: 'ApartmentStatistics',
     component: ApartmentStatistics,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: false }, // Publiczny dostęp
   },
 ];
 
@@ -58,17 +54,30 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore();
 
-  if (authStore.token && !authStore.user) {
-    await authStore.fetchProfile();
+  // POPRAWKA: Pobierz profil tylko jeśli token istnieje i strona wymaga autoryzacji
+  if (authStore.token && !authStore.user && to.meta.requiresAuth) {
+    try {
+      await authStore.fetchProfile();
+    } catch (error) {
+      // Jeśli token jest nieprawidłowy, wyloguj użytkownika
+      authStore.logout();
+    }
   }
 
+  // Wymagane logowanie
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login');
-  } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
-    next('/calendar');
-  } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
-    next('/calendar');
-  } else {
+  } 
+  // Zalogowani nie powinni widzieć stron dla gości (login/register)
+  else if (to.meta.requiresGuest && authStore.isAuthenticated) {
+    next('/');
+  } 
+  // Wymagane uprawnienia admina
+  else if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    next('/');
+  } 
+  // Pozwól przejść dalej
+  else {
     next();
   }
 });

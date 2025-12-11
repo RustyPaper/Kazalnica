@@ -19,6 +19,7 @@ export interface User {
     viewCalendar: boolean;
     addEvent: boolean;
     deleteEvent: boolean;
+    canEditPublicApartments?: boolean; // NOWE
   };
 }
 
@@ -34,6 +35,7 @@ export interface Event {
 export interface Holiday {
   date: string;
   name: string;
+  isHighSeason?: boolean;
 }
 
 export interface LoginCredentials {
@@ -55,10 +57,33 @@ export interface SystemSettings {
   totalSharesTarget: number;
 }
 
-export interface Holiday {
-  date: string;
-  name: string;
-  isHighSeason?: boolean;
+// NOWE: Typ dla apartamentów w statystykach (z informacją o właścicielu i źródle)
+export interface ApartmentStats {
+  number: string;
+  shareAmount?: string;
+  additionalInfo?: string;
+  status?: 'lease_agreement' | 'notice_sent' | 'collection_date' | 'collected';
+  collectionDate?: string;
+  ownerName: string;
+  ownerLogin: string | null;
+  source: 'user' | 'public';
+  phoneNumber?: string;
+  email?: string;
+}
+
+// NOWE: Typ dla publicznych apartamentów (bez powiązania z kontem)
+export interface PublicApartment {
+  id: number;
+  apartmentNumber: string;
+  ownerFirstName?: string;
+  ownerLastName?: string;
+  phoneNumber?: string;
+  email?: string;
+  shareAmount?: string;
+  status?: 'lease_agreement' | 'notice_sent' | 'collection_date' | 'collected';
+  collectionDate?: string;
+  additionalInfo?: string;
+  createdAt: string;
 }
 
 export interface ApartmentStatistics {
@@ -66,13 +91,13 @@ export interface ApartmentStatistics {
   totalShares: number;
   sharePercentage: number;
   totalApartments: number;
-  apartments: Array<Apartment & { ownerName: string; ownerLogin: string }>;
+  apartments: ApartmentStats[]; // ZMIENIONO: użyj ApartmentStats zamiast Apartment & {...}
   statusGroups: {
-    lease_agreement: Apartment[];
-    notice_sent: Apartment[];
-    collection_date: Apartment[];
-    collected: Apartment[];
-    no_status: Apartment[];
+    lease_agreement: ApartmentStats[];
+    notice_sent: ApartmentStats[];
+    collection_date: ApartmentStats[];
+    collected: ApartmentStats[];
+    no_status: ApartmentStats[];
   };
   statusCounts: {
     lease_agreement: number;
@@ -80,5 +105,9 @@ export interface ApartmentStatistics {
     collection_date: number;
     collected: number;
     no_status: number;
+  };
+  sourceCounts?: { // NOWE: opcjonalne statystyki źródeł
+    user: number;
+    public: number;
   };
 }

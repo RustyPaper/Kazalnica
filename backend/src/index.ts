@@ -10,6 +10,7 @@ import settingsRoutes from './routes/settings';
 import statisticsRoutes from './routes/statistics';
 // NOWE:
 import { initDatabase } from './utils/initDatabase';
+import publicApartmentsRouter from './routes/publicApartments';
 
 dotenv.config();
 
@@ -37,6 +38,7 @@ app.use('/api/events', eventsRoutes);
 app.use('/api/permissions', permissionsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/statistics', statisticsRoutes);
+app.use('/api/public-apartments', publicApartmentsRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {

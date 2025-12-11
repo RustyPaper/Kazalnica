@@ -22,6 +22,7 @@ export interface User {
     viewCalendar: boolean;
     addEvent: boolean;
     deleteEvent: boolean;
+    canEditPublicApartments?: boolean;
   };
 }
 
@@ -41,3 +42,31 @@ export interface AuthRequest extends Request {
 export interface SystemSettings {
   totalSharesTarget: number;
 }
+
+export interface PublicApartment {
+  id: number;
+  apartmentNumber: string;
+  ownerFirstName?: string;
+  ownerLastName?: string;
+  phoneNumber?: string;
+  email?: string;
+  shareAmount?: string;
+  status?: 'lease_agreement' | 'notice_sent' | 'collection_date' | 'collected';
+  collectionDate?: string;
+  additionalInfo?: string;
+  createdAt: string;
+}
+
+export interface ApartmentStats {
+  number: string;
+  shareAmount?: string;
+  additionalInfo?: string;
+  status?: 'lease_agreement' | 'notice_sent' | 'collection_date' | 'collected';
+  collectionDate?: string;
+  ownerName: string;
+  ownerLogin: string | null;
+  source: 'user' | 'public';
+  phoneNumber?: string;
+  email?: string;
+}
+
