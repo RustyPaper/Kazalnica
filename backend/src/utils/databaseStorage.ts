@@ -89,10 +89,13 @@ export const updateUser = async (id: string, updates: Partial<User>): Promise<Us
     fields.push(`email = $${paramCount++}`);
     values.push(updates.email);
   }
+  
+  // POPRAWKA: Zapisuj apartments nawet jeśli pusta tablica
   if (updates.apartments !== undefined) {
     fields.push(`apartments = $${paramCount++}`);
-    values.push(JSON.stringify(updates.apartments));
+    values.push(JSON.stringify(updates.apartments)); // ✅ [] → "[]"
   }
+  
   if (updates.permissions !== undefined) {
     fields.push(`permissions = $${paramCount++}`);
     values.push(JSON.stringify(updates.permissions));

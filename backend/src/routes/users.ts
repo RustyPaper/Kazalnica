@@ -39,7 +39,12 @@ router.put('/profile', authenticateToken, async (req: AuthRequest, res: Response
 
     if (firstName) updates.firstName = firstName;
     if (lastName !== undefined) updates.lastName = lastName;
-    if (apartments) updates.apartments = apartments;
+    
+    // POPRAWKA: Akceptuj pustą tablicę apartments
+    if (apartments !== undefined) {
+      updates.apartments = apartments; // ✅ Nawet jeśli pusta tablica []
+    }
+    
     if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber;
     if (email !== undefined) updates.email = email;
 
