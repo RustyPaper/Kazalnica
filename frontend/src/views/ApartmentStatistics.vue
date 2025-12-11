@@ -116,6 +116,14 @@
               <div class="status-shares">{{ formatNumber(getStatusShares('collected')) }} udziałów</div>
             </div>
             
+            <div class="status-card" @click="filterByStatus('smr')" style="cursor: pointer;">
+              <div class="status-icon">🏗️</div>
+              <div class="status-count">{{ statistics.statusCounts.smr }}</div>
+              <div class="status-label">SMR</div>
+              <div class="status-percentage">{{ getStatusPercentage('smr') }}%</div>
+              <div class="status-shares">{{ formatNumber(getStatusShares('smr')) }} udziałów</div>
+            </div>
+
             <div class="status-card" @click="filterByStatus('no_status')" style="cursor: pointer;">
               <div class="status-icon">❔</div>
               <div class="status-count">{{ statistics.statusCounts.no_status }}</div>
@@ -139,6 +147,7 @@
                 <option value="notice_sent">Wysłane wezwanie</option>
                 <option value="collection_date">Planowany odbiór</option>
                 <option value="collected">Odebrane</option>
+                <option value="smr">SMR</option>
                 <option value="no_status">Bez statusu</option>
               </select>
               <button 
@@ -215,10 +224,19 @@
       <div v-if="success" class="success" style="margin-top: 20px;">{{ success }}</div>
     </div>
     
+    <!-- Modal dodawania -->
     <AddApartmentModal
       v-if="showAddModal"
       @added="onApartmentAdded"
       @close="showAddModal = false"
+    />
+    
+    <!-- Modal edycji -->
+    <EditApartmentModal
+      v-if="showEditModal && apartmentToEdit"
+      :apartment="apartmentToEdit"
+      @updated="onApartmentUpdated"
+      @close="showEditModal = false"
     />
   </div>
 </template>
@@ -229,6 +247,7 @@ import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
 import { API_URL } from '../config';
 import AddApartmentModal from '../components/AddApartmentModal.vue';
+import EditApartmentModal from '../components/EditApartmentModal.vue'; // NOWE
 
 const authStore = useAuthStore();
 
@@ -238,6 +257,8 @@ const loading = ref(true);
 const error = ref('');
 const success = ref('');
 const showAddModal = ref(false);
+const showEditModal = ref(false); // NOWE
+const apartmentToEdit = ref<any>(null); // NOWE
 const canEditPublic = ref(true);
 const selectedStatusFilter = ref('');
 
@@ -293,6 +314,7 @@ const getStatusLabel = (status?: string): string => {
     'notice_sent': 'Wysłane wezwanie',
     'collection_date': 'Planowany odbiór',
     'collected': 'Odebrane',
+    'smr': 'SMR',
   };
   return labels[status || ''] || 'Bez statusu';
 };
@@ -327,7 +349,6 @@ const clearFilter = () => {
 const filteredApartments = computed(() => {
   if (!statistics.value) return [];
   if (!selectedStatusFilter.value) return statistics.value.apartments;
-  
   if (selectedStatusFilter.value === 'no_status') {
     return statistics.value.apartments.filter((apt: any) => !apt.status);
   }
@@ -335,8 +356,7 @@ const filteredApartments = computed(() => {
   return statistics.value.apartments.filter((apt: any) => apt.status === selectedStatusFilter.value);
 });
 
-const filteredTotalShares =
-computed(() => {
+const filteredTotalShares = computed(() => {
   return filteredApartments.value.reduce((sum: number, apt: any) => {
     return sum + parseFloat(apt.shareAmount || '0');
   }, 0);
@@ -347,9 +367,17 @@ const onApartmentAdded = () => {
   showAddModal.value = false;
 };
 
+// NOWA funkcja edycji
 const editApartment = (apt: any) => {
-  console.log('Edycja lokalu:', apt);
-  // TODO: Implementacja edycji
+  apartmentToEdit.value = apt;
+  showEditModal.value = true;
+};
+
+// NOWA funkcja po aktualizacji
+const onApartmentUpdated = () => {
+  fetchStatistics();
+  showEditModal.value = false;
+  apartmentToEdit.value = null;
 };
 
 onMounted(async () => {
@@ -780,6 +808,11 @@ onMounted(async () => {
   .btn-success {
     width: 100%;
     margin-bottom: 10px;
+  }
+
+  .status-smr {
+  background-color: #e7e7ff;
+  color: #4a4aff;
   }
 }
 </style>

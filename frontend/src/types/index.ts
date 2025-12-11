@@ -2,7 +2,7 @@ export interface Apartment {
   number: string;
   shareAmount?: string;
   additionalInfo?: string;
-  status?: 'lease_agreement' | 'notice_sent' | 'collection_date' | 'collected';
+  status?: 'lease_agreement' | 'notice_sent' | 'collection_date' | 'collected' | 'smr'; // DODANE
   collectionDate?: string;
 }
 
@@ -57,19 +57,22 @@ export interface SystemSettings {
   totalSharesTarget: number;
 }
 
-// NOWE: Typ dla apartamentów w statystykach (z informacją o właścicielu i źródle)
 export interface ApartmentStats {
+  id?: number;
   number: string;
   shareAmount?: string;
   additionalInfo?: string;
-  status?: 'lease_agreement' | 'notice_sent' | 'collection_date' | 'collected';
+  status?: 'lease_agreement' | 'notice_sent' | 'collection_date' | 'collected' | 'smr'; // DODANE
   collectionDate?: string;
   ownerName: string;
   ownerLogin: string | null;
   source: 'user' | 'public';
   phoneNumber?: string;
   email?: string;
+  ownerFirstName?: string;
+  ownerLastName?: string;
 }
+
 
 // NOWE: Typ dla publicznych apartamentów (bez powiązania z kontem)
 export interface PublicApartment {
@@ -91,12 +94,13 @@ export interface ApartmentStatistics {
   totalShares: number;
   sharePercentage: number;
   totalApartments: number;
-  apartments: ApartmentStats[]; // ZMIENIONO: użyj ApartmentStats zamiast Apartment & {...}
+  apartments: ApartmentStats[];
   statusGroups: {
     lease_agreement: ApartmentStats[];
     notice_sent: ApartmentStats[];
     collection_date: ApartmentStats[];
     collected: ApartmentStats[];
+    smr: ApartmentStats[]; // DODANE
     no_status: ApartmentStats[];
   };
   statusCounts: {
@@ -104,9 +108,10 @@ export interface ApartmentStatistics {
     notice_sent: number;
     collection_date: number;
     collected: number;
+    smr: number; // DODANE
     no_status: number;
   };
-  sourceCounts?: { // NOWE: opcjonalne statystyki źródeł
+  sourceCounts?: {
     user: number;
     public: number;
   };

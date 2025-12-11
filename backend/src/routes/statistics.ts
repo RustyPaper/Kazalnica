@@ -1,12 +1,11 @@
 import express, { Response, Request } from 'express';
-import { AuthRequest, ApartmentStats } from '../types';
+import { ApartmentStats } from '../types';
 import { getAllUsers, getSetting } from '../utils/databaseStorage';
 import { getAllPublicApartments } from '../utils/publicApartmentsStorage';
-import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
 
-// Get apartments statistics - PUBLICZNE (bez authenticateToken)
+// Get apartments statistics - PUBLICZNE
 router.get('/apartments', async (req: Request, res: Response) => {
   try {
     const users = await getAllUsers();
@@ -37,6 +36,7 @@ router.get('/apartments', async (req: Request, res: Response) => {
     const publicApartments = await getAllPublicApartments();
     publicApartments.forEach(apt => {
       allApartments.push({
+        id: apt.id, // DODANE: ID dla edycji
         number: apt.apartmentNumber,
         shareAmount: apt.shareAmount,
         additionalInfo: apt.additionalInfo,
@@ -46,7 +46,9 @@ router.get('/apartments', async (req: Request, res: Response) => {
         ownerLogin: null,
         source: "public",
         phoneNumber: apt.phoneNumber,
-        email: apt.email
+        email: apt.email,
+        ownerFirstName: apt.ownerFirstName, // DODANE: Dla edycji
+        ownerLastName: apt.ownerLastName     // DODANE: Dla edycji
       });
     });
 
@@ -92,9 +94,10 @@ router.get('/apartments', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error(error);
+      console.error(error);
     res.status(500).json({ error: 'Błąd serwera' });
   }
 });
 
 export default router;
+

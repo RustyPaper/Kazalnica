@@ -1,7 +1,7 @@
 <template>
   <div class="modal-overlay" @click.self="emit('close')">
     <div class="modal-card">
-      <h3>Dodaj nowy lokal</h3>
+      <h3>Edytuj lokal</h3>
       <form @submit.prevent="submit">
         <div class="form-group">
           <label>Numer lokalu*:</label>
@@ -56,10 +56,15 @@
         </div>
         
         <div v-if="errorMsg" class="error">{{ errorMsg }}</div>
+        <div v-if="successMsg" class="success">{{ successMsg }}</div>
         
         <div class="modal-actions">
-          <button type="submit" class="btn btn-primary">Dodaj</button>
-          <button type="button" class="btn btn-secondary" @click="emit('close')">Anuluj</button>
+          <button type="submit" class="btn btn-primary" :disabled="loading">
+            {{ loading ? 'Zapisywanie...' : 'Zapisz' }}
+          </button>
+          <button type="button" class="btn btn-secondary" @click="emit('close')">
+            Anuluj
+          </button>
         </div>
       </form>
     </div>
@@ -67,12 +72,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { API_URL } from '../config'
+import type { PublicApartment } from '../types'
+
+interface Props {
+  apartment: any // Dane lokalu do edycji
+}
+
+const props = defineProps<Props>()
 
 const emit = defineEmits<{
-  added: []
+  updated: []
   close: []
 }>()
 
@@ -89,15 +101,51 @@ const form = ref({
 })
 
 const errorMsg = ref('')
+const successMsg = ref('')
+const loading = ref(false)
+
+// Załaduj dane do formularza
+onMounted(() => {
+  if (props.apartment) {
+    form.value = {
+      apartmentNumber: props.apartment.number || props.apartment.apartmentNumber || '',
+      ownerFirstName: props.apartment.ownerFirstName || '',
+      ownerLastName: props.apartment.ownerLastName || '',
+      phoneNumber: props.apartment.phoneNumber || '',
+      email: props.apartment.email || '',
+      shareAmount: props.apartment.shareAmount || '',
+      status: props.apartment.status || '',
+      collectionDate: props.apartment.collectionDate || '',
+      additionalInfo: props.apartment.additionalInfo || ''
+    }
+  }
+})
 
 async function submit() {
+  loading.value = true
+  errorMsg.value = ''
+  successMsg.value = ''
+  
   try {
-    await axios.post(`${API_URL}/public-apartments`, form.value)
-    errorMsg.value = ''
-    emit('added')
-    emit('close')
+    // Wyciągnij ID z apartamentu (może być w różnych formatach)
+    const aptId = props.apartment.id || props.apartment.apartmentId
+    
+    if (!aptId) {
+      throw new Error('Brak ID lokalu do edycji')
+    }
+    
+    await axios.put(`${API_URL}/public-apartments/${aptId}`, form.value)
+    
+    successMsg.value = 'Lokal zaktualizowany pomyślnie!'
+    
+    setTimeout(() => {
+      emit('updated')
+      emit('close')
+    }, 1000)
   } catch (e: any) {
-    errorMsg.value = e.response?.data?.error || 'Nie udało się dodać lokalu.'
+    errorMsg.value = e.response?.data?.error || 'Nie udało się zaktualizować lokalu.'
+  } finally {
+    loading.value = false
   }
 }
 </script>
@@ -169,6 +217,15 @@ async function submit() {
   font-size: 14px;
 }
 
+.success {
+  color: #155724;
+  background: #d4edda;
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
 .modal-actions {
   display: flex;
   gap: 10px;
@@ -186,12 +243,17 @@ async function submit() {
   transition: background 0.2s;
 }
 
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .btn-primary {
   background: #667eea;
   color: white;
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   background: #5568d3;
 }
 
