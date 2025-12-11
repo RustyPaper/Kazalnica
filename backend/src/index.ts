@@ -2,15 +2,15 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
+import path from 'path';
 import authRoutes from './routes/auth';
 import usersRoutes from './routes/users';
 import eventsRoutes from './routes/events';
 import permissionsRoutes from './routes/permissions';
 import settingsRoutes from './routes/settings';
 import statisticsRoutes from './routes/statistics';
-// NOWE:
-import { initDatabase } from './utils/initDatabase';
 import publicApartmentsRouter from './routes/publicApartments';
+import { initDatabase } from './utils/initDatabase';
 
 dotenv.config();
 
@@ -31,7 +31,7 @@ app.use(cors({
 // Body parser
 app.use(bodyParser.json());
 
-// Routes
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/events', eventsRoutes);
@@ -51,10 +51,23 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// ============= DODANE: Serwowanie frontendu w produkcji =============
+if (process.env.NODE_ENV === 'production') {
+  const frontendPath = path.join(__dirname, '../../frontend/dist');
+  
+  // Serwuj statyczne pliki
+  app.use(express.static(frontendPath));
+  
+  // Wszystkie nieznane ścieżki (nie-API) → index.html (dla Vue Router)
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  });
+}
+// ====================================================================
+
 // Initialize database and start server
 const startServer = async () => {
   try {
-    // Initialize database tables
     await initDatabase();
     
     app.listen(PORT, '0.0.0.0', () => {
@@ -77,4 +90,3 @@ const startServer = async () => {
 };
 
 startServer();
-
