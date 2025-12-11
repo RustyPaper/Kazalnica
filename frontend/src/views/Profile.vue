@@ -104,6 +104,7 @@
                 <option value="notice_sent">Wysłane wezwanie</option>
                 <option value="collection_date">Odbieram w dniu</option>
                 <option value="collected">Odebrane</option>
+                <option value="smr">SMR</option>
               </select>
             </div>
             
@@ -174,6 +175,7 @@ const formData = ref({
   password: '',
 });
 
+const isEditing = ref(false); // Flaga: czy użytkownik edytuje
 const error = ref('');
 const success = ref('');
 const isSyncing = ref(false);
@@ -182,10 +184,16 @@ let refreshInterval: number | null = null;
 // Auto-refresh co 30 sekund
 const startAutoRefresh = () => {
   refreshInterval = window.setInterval(async () => {
+    // ✅ POPRAWKA: Nie refreshuj podczas edycji
+    if (isEditing.value) {
+      console.log('⏸️ Pomijam auto-refresh – użytkownik edytuje');
+      return;
+    }
+    
     console.log('🔄 Auto-refresh danych profilu...');
     await authStore.fetchProfile();
     
-    // Zaktualizuj formularz jeśli użytkownik nie edytuje
+    // Zaktualizuj formularz jeśli użytkownik nie edytuje żadnego pola
     if (document.activeElement?.tagName !== 'INPUT' && 
         document.activeElement?.tagName !== 'TEXTAREA' &&
         document.activeElement?.tagName !== 'SELECT') {
@@ -213,16 +221,16 @@ onMounted(() => {
     };
   }
   
-  // Uruchom auto-refresh
   startAutoRefresh();
 });
 
 onUnmounted(() => {
-  // Zatrzymaj auto-refresh gdy komponent zostanie zniszczony
   stopAutoRefresh();
 });
 
 const addApartment = () => {
+  isEditing.value = true; // ✅ Zablokuj auto-refresh
+  
   formData.value.apartments.push({
     number: '',
     shareAmount: '',
@@ -233,7 +241,10 @@ const addApartment = () => {
 };
 
 const removeApartment = (index: number) => {
-  formData.value.apartments.splice(index, 1);
+  if (confirm('Czy na pewno chcesz usunąć ten lokal?')) {
+    isEditing.value = true; // ✅ Zablokuj auto-refresh
+    formData.value.apartments.splice(index, 1);
+  }
 };
 
 const handleUpdate = async () => {
@@ -250,45 +261,11 @@ const handleUpdate = async () => {
   }
   
   try {
-    // KROK 1: Pobierz najnowsze dane z serwera
-    console.log('🔄 Synchronizuję dane z serwera...');
-    const fetchResult = await authStore.fetchProfile();
-    
-    if (!fetchResult.success) {
-      error.value = 'Błąd synchronizacji. Spróbuj ponownie.';
-      isSyncing.value = false;
-      return;
-    }
-    
-    // KROK 2: Merguj apartamenty
-    const serverApartments = authStore.user?.apartments || [];
-    const localApartments = validApartments;
-    
-    // Utwórz mapę po numerach apartamentów
-    const apartmentMap = new Map();
-    
-    // Najpierw dodaj wszystkie z serwera
-    serverApartments.forEach(apt => {
-      apartmentMap.set(apt.number, apt);
-    });
-    
-    // Potem nadpisz/dodaj lokalne zmiany
-    localApartments.forEach(apt => {
-      apartmentMap.set(apt.number, apt);
-    });
-    
-    // Zamień z powrotem na tablicę
-    const mergedApartments = Array.from(apartmentMap.values());
-    
-    console.log('📊 Apartamenty przed merge:', serverApartments.length);
-    console.log('📊 Apartamenty lokalne:', localApartments.length);
-    console.log('📊 Apartamenty po merge:', mergedApartments.length);
-    
-    // KROK 3: Przygotuj dane do zapisu
+    // ✅ POPRAWKA: Usuń merge – zapisuj TYLKO to co jest w formularzu
     const updateData: any = {
       firstName: formData.value.firstName,
       lastName: formData.value.lastName,
-      apartments: mergedApartments, // Zmergowane dane
+      apartments: validApartments, // ✅ Tylko aktualne dane z formularza
       phoneNumber: formData.value.phoneNumber,
       email: formData.value.email,
     };
@@ -297,15 +274,18 @@ const handleUpdate = async () => {
       updateData.password = formData.value.password;
     }
     
-    // KROK 4: Zapisz na serwerze
-    console.log('💾 Zapisuję zmienione dane...');
+    console.log('💾 Zapisuję dane:', updateData);
+    
     const result = await authStore.updateProfile(updateData);
     
     if (result.success) {
-      success.value = '✅ Profil został zaktualizowany (zsynchronizowano z serwerem)';
+      success.value = '✅ Profil został zaktualizowany';
       formData.value.password = '';
       
-      // KROK 5: Odśwież formularz z najnowszymi danymi
+      // ✅ Odblokuj auto-refresh
+      isEditing.value = false;
+      
+      // Odśwież formularz najnowszymi danymi z serwera
       formData.value.apartments = JSON.parse(JSON.stringify(authStore.user?.apartments || []));
       
       setTimeout(() => {
@@ -313,10 +293,12 @@ const handleUpdate = async () => {
       }, 5000);
     } else {
       error.value = result.error || 'Błąd aktualizacji profilu';
+      isEditing.value = false;
     }
   } catch (err: any) {
     console.error('Update error:', err);
-    error.value = 'Błąd synchronizacji danych. Odśwież stronę i spróbuj ponownie.';
+    error.value = 'Błąd zapisu danych. Spróbuj ponownie.';
+    isEditing.value = false;
   } finally {
     isSyncing.value = false;
   }
@@ -518,4 +500,3 @@ const handleUpdate = async () => {
   }
 }
 </style>
-
