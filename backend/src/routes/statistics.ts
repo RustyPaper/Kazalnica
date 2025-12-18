@@ -1,7 +1,8 @@
 import express, { Response, Request } from 'express';
-import { ApartmentStats } from '../types';
-import { getAllUsers, getSetting } from '../utils/databaseStorage';
+import { AuthRequest, ApartmentStats } from '../types';
+import { getAllUsers, getSetting, getUserById, updateUser } from '../utils/databaseStorage';
 import { getAllPublicApartments } from '../utils/publicApartmentsStorage';
+import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -25,6 +26,7 @@ router.get('/apartments', async (req: Request, res: Response) => {
           collectionDate: apt.collectionDate,
           ownerName: `${user.firstName} ${user.lastName || ''}`.trim(),
           ownerLogin: user.login,
+          userId: user.id, // DODANE: ID użytkownika dla edycji przez admina
           source: "user",
           phoneNumber: user.phoneNumber,
           email: user.email
@@ -36,7 +38,7 @@ router.get('/apartments', async (req: Request, res: Response) => {
     const publicApartments = await getAllPublicApartments();
     publicApartments.forEach(apt => {
       allApartments.push({
-        id: apt.id, // DODANE: ID dla edycji
+        id: apt.id, // ID dla edycji
         number: apt.apartmentNumber,
         shareAmount: apt.shareAmount,
         additionalInfo: apt.additionalInfo,
@@ -47,8 +49,8 @@ router.get('/apartments', async (req: Request, res: Response) => {
         source: "public",
         phoneNumber: apt.phoneNumber,
         email: apt.email,
-        ownerFirstName: apt.ownerFirstName, // DODANE: Dla edycji
-        ownerLastName: apt.ownerLastName     // DODANE: Dla edycji
+        ownerFirstName: apt.ownerFirstName, // Dla edycji
+        ownerLastName: apt.ownerLastName     // Dla edycji
       });
     });
 
@@ -96,10 +98,68 @@ router.get('/apartments', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-      console.error(error);
+    console.error(error);
+    res.status(500).json({ error: 'Błąd serwera' });
+  }
+});
+
+// NOWY: Edycja apartamentu użytkownika (tylko admin)
+router.put('/apartments/user/:userId/:apartmentNumber', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    // Sprawdź czy admin
+    if (req.user!.role !== 'admin') {
+      return res.status(403).json({ error: 'Tylko admin może edytować lokale użytkowników' });
+    }
+
+    const { userId, apartmentNumber } = req.params;
+    const updates = req.body;
+
+    console.log('📝 Admin edytuje lokal użytkownika:', { userId, apartmentNumber, updates });
+
+    // Pobierz użytkownika
+    const user = await getUserById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Użytkownik nie znaleziony' });
+    }
+
+    // Znajdź apartament
+    const aptIndex = user.apartments.findIndex(apt => apt.number === decodeURIComponent(apartmentNumber));
+    if (aptIndex === -1) {
+      return res.status(404).json({ error: 'Lokal nie znaleziony' });
+    }
+
+    // Zaktualizuj apartament
+    user.apartments[aptIndex] = {
+      number: updates.number !== undefined ? updates.number : user.apartments[aptIndex].number,
+      shareAmount: updates.shareAmount !== undefined ? updates.shareAmount : user.apartments[aptIndex].shareAmount,
+      status: updates.status !== undefined ? updates.status : user.apartments[aptIndex].status,
+      collectionDate: updates.collectionDate !== undefined ? updates.collectionDate : user.apartments[aptIndex].collectionDate,
+      additionalInfo: updates.additionalInfo !== undefined ? updates.additionalInfo : user.apartments[aptIndex].additionalInfo
+    };
+
+    console.log('💾 Zapisuję zaktualizowany lokal:', user.apartments[aptIndex]);
+
+    // Zapisz w bazie
+    const updatedUser = await updateUser(userId, { apartments: user.apartments });
+
+    if (!updatedUser) {
+      return res.status(500).json({ error: 'Błąd zapisu danych' });
+    }
+
+    res.json({
+      message: 'Lokal użytkownika zaktualizowany',
+      apartment: updatedUser.apartments[aptIndex],
+      user: {
+        id: updatedUser.id,
+        login: updatedUser.login,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName
+      }
+    });
+  } catch (error) {
+    console.error('❌ Update user apartment error:', error);
     res.status(500).json({ error: 'Błąd serwera' });
   }
 });
 
 export default router;
-

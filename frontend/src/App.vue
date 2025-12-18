@@ -2,7 +2,7 @@
   <div id="app">
     <nav class="navbar">
       <div class="navbar-content">
-        <div class="navbar-title">Kalendarz Apartamentów</div>
+        <div class="navbar-title">Statystyki Apartamentów</div>
         
         <!-- Hamburger button (mobile) -->
         <button class="hamburger" @click="toggleMenu" :class="{ active: menuOpen }">
@@ -12,17 +12,17 @@
         </button>
         
         <!-- Menu -->
-        <ul class="navbar-menu" :class="{ open: menuOpen }">
-          <li>
-            <router-link to="/" :class="{ active: $route.path === '/' }" @click="closeMenu">
-              📅 Kalendarz
-            </router-link>
-          </li>
-          <li>
-            <router-link to="/statistics" :class="{ active: $route.path === '/statistics' }" @click="closeMenu">
-              📊 Statystyki
-            </router-link>
-          </li>
+          <ul class="navbar-menu" :class="{ open: menuOpen }">
+            <li>
+              <router-link to="/" :class="{ active: $route.path === '/' }" @click="closeMenu">
+                📊 Statystyki
+              </router-link>
+            </li>
+            <li>
+              <router-link to="/calendar" :class="{ active: $route.path === '/calendar' }" @click="closeMenu">
+                📅 Kalendarz
+              </router-link>
+            </li>
           
           <!-- Dla niezalogowanych użytkowników -->
           <template v-if="!authStore.isAuthenticated">

@@ -10,9 +10,9 @@ import ApartmentStatistics from '../views/ApartmentStatistics.vue';
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    name: 'Calendar',
-    component: Calendar,
-    meta: { requiresAuth: false }, // Publiczny dostęp
+    name: 'ApartmentStatistics', // ZMIENIONO: Statystyki jako główna
+    component: ApartmentStatistics,
+    meta: { requiresAuth: false },
   },
   {
     path: '/login',
@@ -39,10 +39,10 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
-    path: '/statistics',
-    name: 'ApartmentStatistics',
-    component: ApartmentStatistics,
-    meta: { requiresAuth: false }, // Publiczny dostęp
+    path: '/calendar',
+    name: 'Calendar', // ZMIENIONO: Kalendarz jako podstrona
+    component: Calendar,
+    meta: { requiresAuth: false },
   },
 ];
 
@@ -67,17 +67,11 @@ router.beforeEach(async (to, from, next) => {
   // Wymagane logowanie
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login');
-  } 
-  // Zalogowani nie powinni widzieć stron dla gości (login/register)
-  else if (to.meta.requiresGuest && authStore.isAuthenticated) {
-    next('/');
-  } 
-  // Wymagane uprawnienia admina
-  else if (to.meta.requiresAdmin && !authStore.isAdmin) {
-    next('/');
-  } 
-  // Pozwól przejść dalej
-  else {
+  } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
+    next('/'); // ZMIENIONO: Przekierowanie na statystyki
+  } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    next('/'); // ZMIENIONO: Przekierowanie na statystyki
+  } else {
     next();
   }
 });

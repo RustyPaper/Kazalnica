@@ -1,16 +1,15 @@
-import express, { Response } from 'express';
+import express, { Response, Request } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import jwt from 'jsonwebtoken';
 import { AuthRequest, Event } from '../types';
-// STARE: import { readJSON, writeJSON } from '../utils/fileStorage';
-// NOWE:
 import { getAllEvents, getEventById, createEvent, updateEvent, deleteEvent } from '../utils/databaseStorage';
-import { authenticateToken, requirePermission } from '../middleware/auth';
+import { authenticateToken, requirePermission, JWT_SECRET } from '../middleware/auth';
 import { getPolishHolidays } from '../utils/holidays';
 
 const router = express.Router();
 
-// Get holidays for a year
-router.get('/holidays/:year', authenticateToken, requirePermission('viewCalendar'), (req: AuthRequest, res: Response) => {
+// Get holidays for a year - PUBLICZNE (zmieniono)
+router.get('/holidays/:year', (req: Request, res: Response) => {
   const year = parseInt(req.params.year);
   
   if (isNaN(year) || year < 2000 || year > 2100) {
@@ -21,8 +20,8 @@ router.get('/holidays/:year', authenticateToken, requirePermission('viewCalendar
   res.json(holidays);
 });
 
-// Get all events
-router.get('/', authenticateToken, requirePermission('viewCalendar'), async (req: AuthRequest, res: Response) => {
+// Get all events - PUBLICZNE (zmieniono)
+router.get('/', async (req: Request, res: Response) => {
   try {
     const events = await getAllEvents();
     res.json(events);
@@ -32,33 +31,52 @@ router.get('/', authenticateToken, requirePermission('viewCalendar'), async (req
   }
 });
 
-// Create event
-router.post('/', authenticateToken, requirePermission('addEvent'), async (req: AuthRequest, res: Response) => {
+// Create event - PUBLICZNE (każdy może dodać, ale rozróżniamy zalogowanych)
+router.post('/', async (req: Request, res: Response) => {
   try {
     const { date, apartmentNumber, description } = req.body;
 
     if (!date || !apartmentNumber) {
-      return res.status(400).json({ error: 'Data i numer apartamentu są wymagane' });
+      return res.status(400).json({ error: 'Data i numer lokalu są wymagane' });
+    }
+
+    // Sprawdź czy użytkownik jest zalogowany (opcjonalnie)
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    let createdBy = 'anonymous'; // Domyślnie anonim
+    
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        createdBy = decoded.id; // Jeśli zalogowany, użyj ID użytkownika
+        console.log('✅ Wydarzenie tworzone przez zalogowanego:', decoded.login);
+      } catch (err) {
+        // Token nieprawidłowy, pozostaw jako anonymous
+        console.log('⚠️ Token nieprawidłowy, tworzę jako anonymous');
+      }
+    } else {
+      console.log('📝 Wydarzenie tworzone przez anonima');
     }
 
     const newEvent: Event = {
       id: uuidv4(),
       date,
       apartmentNumber,
-      description,
-      createdBy: req.user!.id,
+      description: description || '',
+      createdBy,
       createdAt: new Date().toISOString()
     };
 
     const createdEvent = await createEvent(newEvent);
     res.status(201).json(createdEvent);
   } catch (error) {
-    console.error(error);
+    console.error('❌ Błąd tworzenia wydarzenia:', error);
     res.status(500).json({ error: 'Błąd serwera' });
   }
 });
 
-// Delete event
+// Delete event - CHRONIONE (tylko zalogowani z uprawnieniem)
 router.delete('/:eventId', authenticateToken, requirePermission('deleteEvent'), async (req: AuthRequest, res: Response) => {
   try {
     const { eventId } = req.params;
@@ -66,6 +84,14 @@ router.delete('/:eventId', authenticateToken, requirePermission('deleteEvent'), 
     const event = await getEventById(eventId);
     if (!event) {
       return res.status(404).json({ error: 'Wydarzenie nie znalezione' });
+    }
+
+    // Admin może usuwać wszystko, user tylko swoje
+    const isAdmin = req.user!.role === 'admin';
+    const isOwner = event.createdBy === req.user!.id;
+    
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: 'Możesz usuwać tylko swoje wydarzenia' });
     }
 
     await deleteEvent(eventId);
@@ -76,7 +102,7 @@ router.delete('/:eventId', authenticateToken, requirePermission('deleteEvent'), 
   }
 });
 
-// Update event
+// Update event - CHRONIONE (tylko zalogowani z uprawnieniem)
 router.put('/:eventId', authenticateToken, requirePermission('addEvent'), async (req: AuthRequest, res: Response) => {
   try {
     const { eventId } = req.params;
@@ -87,7 +113,7 @@ router.put('/:eventId', authenticateToken, requirePermission('addEvent'), async 
       return res.status(404).json({ error: 'Wydarzenie nie znalezione' });
     }
 
-    // Check if user created the event or is admin
+    // Sprawdź czy użytkownik stworzył wydarzenie lub jest adminem
     const isAdmin = req.user!.role === 'admin';
     const isOwner = event.createdBy === req.user!.id;
     

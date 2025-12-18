@@ -62,7 +62,7 @@ export interface ApartmentStats {
   number: string;
   shareAmount?: string;
   additionalInfo?: string;
-  status?: 'lease_agreement' | 'notice_sent' | 'collection_date' | 'collected' | 'smr'; // DODANE
+  status?: 'lease_agreement' | 'notice_sent' | 'collection_date' | 'collected' | 'smr';
   collectionDate?: string;
   ownerName: string;
   ownerLogin: string | null;
@@ -71,7 +71,9 @@ export interface ApartmentStats {
   email?: string;
   ownerFirstName?: string;
   ownerLastName?: string;
+  userId?: string; // DODANE: ID właściciela (dla edycji przez admina)
 }
+
 
 
 // NOWE: Typ dla publicznych apartamentów (bez powiązania z kontem)

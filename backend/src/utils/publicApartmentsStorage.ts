@@ -136,3 +136,47 @@ export const getPublicApartmentById = async (id: number): Promise<PublicApartmen
   );
   return result.rows[0] || null;
 };
+
+// Zapisz historię edycji
+export const logApartmentEdit = async (
+  apartmentId: number,
+  changes: Record<string, any>,
+  oldValues: Record<string, any>,
+  editedBy: string,
+  ipAddress: string,
+  userAgent: string
+): Promise<void> => {
+  await pool.query(
+    `INSERT INTO public_apartments_edit_history 
+      (apartment_id, changes, old_values, edited_by, ip_address, user_agent)
+    VALUES ($1, $2, $3, $4, $5, $6)`,
+    [
+      apartmentId,
+      JSON.stringify(changes),
+      JSON.stringify(oldValues),
+      editedBy,
+      ipAddress,
+      userAgent
+    ]
+  );
+};
+
+// Pobierz historię edycji lokalu
+export const getApartmentEditHistory = async (apartmentId: number): Promise<any[]> => {
+  const result = await pool.query(
+    `SELECT 
+      id,
+      changes,
+      old_values as "oldValues",
+      edited_by as "editedBy",
+      ip_address as "ipAddress",
+      user_agent as "userAgent",
+      edited_at as "editedAt"
+    FROM public_apartments_edit_history
+    WHERE apartment_id = $1
+    ORDER BY edited_at DESC
+    LIMIT 50`,
+    [apartmentId]
+  );
+  return result.rows;
+};

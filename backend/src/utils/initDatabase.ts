@@ -62,6 +62,25 @@ export const initDatabase = async () => {
       );
     `);
 
+        // Tabela historii edycji publicznych lokali
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public_apartments_edit_history (
+        id SERIAL PRIMARY KEY,
+        apartment_id INTEGER REFERENCES public_apartments(id) ON DELETE CASCADE,
+        changes JSONB NOT NULL,
+        old_values JSONB,
+        edited_by VARCHAR(100),
+        ip_address VARCHAR(45),
+        user_agent TEXT,
+        edited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+await client.query(`
+  CREATE INDEX IF NOT EXISTS idx_edit_history_apartment ON public_apartments_edit_history(apartment_id);
+  CREATE INDEX IF NOT EXISTS idx_edit_history_date ON public_apartments_edit_history(edited_at);
+`);
+
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_public_apartments_number ON public_apartments(apartment_number);
     `);

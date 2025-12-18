@@ -2,31 +2,40 @@
   <div class="modal-overlay" @click.self="emit('close')">
     <div class="modal-card">
       <h3>Edytuj lokal</h3>
+      
+      <!-- Info dla admina edytującego lokal użytkownika -->
+      <div v-if="apartment._source === 'user' && authStore.isAdmin" class="admin-notice">
+        ⚠️ Edytujesz lokal użytkownika: <strong>{{ apartment.ownerName }}</strong>
+      </div>
+      
       <form @submit.prevent="submit">
         <div class="form-group">
           <label>Numer lokalu*:</label>
           <input v-model="form.apartmentNumber" required />
         </div>
         
-        <div class="form-group">
-          <label>Imię:</label>
-          <input v-model="form.ownerFirstName" />
-        </div>
-        
-        <div class="form-group">
-          <label>Nazwisko:</label>
-          <input v-model="form.ownerLastName" />
-        </div>
-        
-        <div class="form-group">
-          <label>Numer telefonu:</label>
-          <input v-model="form.phoneNumber" />
-        </div>
-        
-        <div class="form-group">
-          <label>Email:</label>
-          <input type="email" v-model="form.email" />
-        </div>
+        <!-- Pola dla publicznych lokali -->
+        <template v-if="apartment._source === 'public'">
+          <div class="form-group">
+            <label>Imię:</label>
+            <input v-model="form.ownerFirstName" />
+          </div>
+          
+          <div class="form-group">
+            <label>Nazwisko:</label>
+            <input v-model="form.ownerLastName" />
+          </div>
+          
+          <div class="form-group">
+            <label>Numer telefonu:</label>
+            <input v-model="form.phoneNumber" />
+          </div>
+          
+          <div class="form-group">
+            <label>Email:</label>
+            <input type="email" v-model="form.email" />
+          </div>
+        </template>
         
         <div class="form-group">
           <label>Ilość udziałów:</label>
@@ -75,13 +84,14 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { API_URL } from '../config'
-import type { PublicApartment } from '../types'
+import { useAuthStore } from '../stores/auth'
 
 interface Props {
-  apartment: any // Dane lokalu do edycji
+  apartment: any
 }
 
 const props = defineProps<Props>()
+const authStore = useAuthStore()
 
 const emit = defineEmits<{
   updated: []
@@ -104,19 +114,20 @@ const errorMsg = ref('')
 const successMsg = ref('')
 const loading = ref(false)
 
-// Załaduj dane do formularza
 onMounted(() => {
   if (props.apartment) {
+    const apt = props.apartment
+    
     form.value = {
-      apartmentNumber: props.apartment.number || props.apartment.apartmentNumber || '',
-      ownerFirstName: props.apartment.ownerFirstName || '',
-      ownerLastName: props.apartment.ownerLastName || '',
-      phoneNumber: props.apartment.phoneNumber || '',
-      email: props.apartment.email || '',
-      shareAmount: props.apartment.shareAmount || '',
-      status: props.apartment.status || '',
-      collectionDate: props.apartment.collectionDate || '',
-      additionalInfo: props.apartment.additionalInfo || ''
+      apartmentNumber: apt.number || apt.apartmentNumber || '',
+      ownerFirstName: apt.ownerFirstName || '',
+      ownerLastName: apt.ownerLastName || '',
+      phoneNumber: apt.phoneNumber || '',
+      email: apt.email || '',
+      shareAmount: apt.shareAmount || '',
+      status: apt.status || '',
+      collectionDate: apt.collectionDate || '',
+      additionalInfo: apt.additionalInfo || ''
     }
   }
 })
@@ -127,14 +138,71 @@ async function submit() {
   successMsg.value = ''
   
   try {
-    // Wyciągnij ID z apartamentu (może być w różnych formatach)
-    const aptId = props.apartment.id || props.apartment.apartmentId
+    console.log('🔍 Apartament do edycji:', props.apartment)
     
-    if (!aptId) {
-      throw new Error('Brak ID lokalu do edycji')
+    const source = props.apartment._source || props.apartment.source
+    const ownerLogin = props.apartment._ownerLogin || props.apartment.ownerLogin
+    const originalNumber = props.apartment._originalNumber || props.apartment.number
+    const userId = props.apartment._userId || props.apartment.userId
+    
+    console.log('📝 Dane:', { source, ownerLogin, originalNumber, userId })
+    
+    let endpoint = ''
+    let payload: any = {}
+    
+    if (source === 'public') {
+      // Edycja publicznego wpisu
+      const aptId = props.apartment._id || props.apartment.id
+      if (!aptId) {
+        throw new Error('Brak ID lokalu publicznego')
+      }
+      
+      endpoint = `${API_URL}/public-apartments/${aptId}`
+      payload = {
+        apartmentNumber: form.value.apartmentNumber,
+        ownerFirstName: form.value.ownerFirstName,
+        ownerLastName: form.value.ownerLastName,
+        phoneNumber: form.value.phoneNumber,
+        email: form.value.email,
+        shareAmount: form.value.shareAmount,
+        status: form.value.status,
+        collectionDate: form.value.collectionDate,
+        additionalInfo: form.value.additionalInfo
+      }
+      
+      console.log('📤 Publiczny endpoint:', endpoint)
+    } else if (source === 'user') {
+      // Edycja wpisu użytkownika (tylko admin)
+      console.log('👤 Edycja lokalu użytkownika')
+      console.log('🔐 Czy admin?', authStore.isAdmin)
+      
+      if (!authStore.isAdmin) {
+        throw new Error('Tylko admin może edytować lokale użytkowników')
+      }
+      
+      if (!userId) {
+        console.error('❌ Brak userId w danych apartamentu:', props.apartment)
+        throw new Error('Brak ID właściciela lokalu')
+      }
+      
+      endpoint = `${API_URL}/statistics/apartments/user/${userId}/${encodeURIComponent(originalNumber)}`
+      payload = {
+        number: form.value.apartmentNumber,
+        shareAmount: form.value.shareAmount,
+        status: form.value.status,
+        collectionDate: form.value.collectionDate,
+        additionalInfo: form.value.additionalInfo
+      }
+      
+      console.log('📤 User endpoint:', endpoint)
+      console.log('📦 Payload:', payload)
+    } else {
+      throw new Error('Nieznane źródło danych: ' + source)
     }
     
-    await axios.put(`${API_URL}/public-apartments/${aptId}`, form.value)
+    console.log('🚀 Wysyłam request...')
+    const response = await axios.put(endpoint, payload)
+    console.log('✅ Odpowiedź:', response.data)
     
     successMsg.value = 'Lokal zaktualizowany pomyślnie!'
     
@@ -143,7 +211,15 @@ async function submit() {
       emit('close')
     }, 1000)
   } catch (e: any) {
-    errorMsg.value = e.response?.data?.error || 'Nie udało się zaktualizować lokalu.'
+    console.error('❌ Błąd edycji:', e)
+    console.error('❌ Response:', e.response?.data)
+    errorMsg.value = e.message || e.response?.data?.error || 'Nie udało się zaktualizować lokalu.'
+        // Obsługa rate limiting
+    if (e.response?.status === 429) {
+      errorMsg.value = '⏳ Zbyt wiele edycji. Spróbuj ponownie za 15 minut lub zaloguj się, aby uniknąć limitów.';
+    } else {
+      errorMsg.value = e.message || e.response?.data?.error || 'Nie udało się zaktualizować lokalu.';
+    }
   } finally {
     loading.value = false
   }
@@ -178,6 +254,16 @@ async function submit() {
   margin-top: 0;
   margin-bottom: 20px;
   color: #333;
+}
+
+.admin-notice {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  color: #856404;
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  font-size: 14px;
 }
 
 .form-group {

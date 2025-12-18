@@ -3,8 +3,8 @@
     <div class="card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <h2>Kalendarz</h2>
+        <!-- ZMIENIONO: Przycisk dla wszystkich (nie tylko zalogowanych) -->
         <button
-          v-if="authStore.hasPermission('addEvent')"
           class="btn btn-primary"
           @click="openAddEventModal"
         >
@@ -62,6 +62,17 @@
           <strong>Opis:</strong> {{ selectedEventDetails.description || 'Brak opisu' }}
         </div>
         
+        <!-- DODANO: Informacja o anonimowym twórcy -->
+        <div style="margin-bottom: 15px;">
+          <strong>Utworzone przez:</strong> 
+          <span v-if="selectedEventDetails.createdBy === 'anonymous'" class="badge-anonymous">
+            Anonim
+          </span>
+          <span v-else>
+            Użytkownik
+          </span>
+        </div>
+        
         <div style="margin-bottom: 15px;">
           <strong>Utworzono:</strong> {{ formatDateTime(selectedEventDetails.createdAt) }}
         </div>
@@ -75,7 +86,7 @@
             Edytuj
           </button>
           <button
-            v-if="authStore.hasPermission('deleteEvent')"
+            v-if="canDeleteEvent(selectedEventDetails)"
             class="btn btn-danger"
             @click="deleteEventConfirm"
           >
@@ -118,6 +129,7 @@ const selectedEventDetails = ref<Event | null>(null);
 
 const fetchEvents = async () => {
   try {
+    // ZMIENIONO: Nie wysyłaj tokenu dla GET (endpoint publiczny)
     const response = await axios.get(`${API_URL}/events`);
     events.value = response.data;
     error.value = '';
@@ -128,6 +140,7 @@ const fetchEvents = async () => {
 
 const fetchHolidays = async () => {
   try {
+    // ZMIENIONO: Nie wysyłaj tokenu dla GET (endpoint publiczny)
     const response = await axios.get(`${API_URL}/events/holidays/${currentYear.value}`);
     holidays.value = response.data;
     error.value = '';
@@ -148,12 +161,11 @@ const closeEventModal = () => {
   editingEvent.value = null;
 };
 
+// ZMIENIONO: Każdy może kliknąć dzień (nie tylko z uprawnieniami)
 const handleDayClick = (date: string) => {
-  if (authStore.hasPermission('addEvent')) {
-    selectedDate.value = date;
-    editingEvent.value = null;
-    showEventModal.value = true;
-  }
+  selectedDate.value = date;
+  editingEvent.value = null;
+  showEventModal.value = true;
 };
 
 const handleEventClick = (event: Event) => {
@@ -166,8 +178,41 @@ const closeEventDetails = () => {
   selectedEventDetails.value = null;
 };
 
+// Sprawdź czy użytkownik może edytować wydarzenie
 const canEditEvent = (event: Event): boolean => {
-  return event.createdBy === authStore.user?.id || authStore.isAdmin;
+  // Niezalogowany nie może edytować
+  if (!authStore.isAuthenticated) {
+    return false;
+  }
+  
+  // Admin może edytować wszystko
+  if (authStore.isAdmin) {
+    return true;
+  }
+  
+  // User może edytować tylko swoje (nie anonimowe)
+  return event.createdBy === authStore.user?.id;
+};
+
+// NOWA funkcja: Sprawdź czy użytkownik może usunąć wydarzenie
+const canDeleteEvent = (event: Event): boolean => {
+  // Niezalogowany nie może usuwać
+  if (!authStore.isAuthenticated) {
+    return false;
+  }
+  
+  // Sprawdź uprawnienie deleteEvent
+  if (!authStore.hasPermission('deleteEvent') && !authStore.isAdmin) {
+    return false;
+  }
+  
+  // Admin może usuwać wszystko
+  if (authStore.isAdmin) {
+    return true;
+  }
+  
+  // User może usuwać tylko swoje (nie anonimowe)
+  return event.createdBy === authStore.user?.id;
 };
 
 const editEvent = (event: Event) => {
@@ -182,11 +227,16 @@ const handleSaveEvent = async (eventData: Partial<Event>) => {
     success.value = '';
     
     if (eventData.id) {
+      // Edycja (wymaga logowania)
       await axios.put(`${API_URL}/events/${eventData.id}`, eventData);
       success.value = 'Wydarzenie zaktualizowane';
     } else {
+      // Dodawanie (dostępne dla wszystkich)
+      // Token zostanie automatycznie dodany przez axios interceptor jeśli użytkownik zalogowany
       await axios.post(`${API_URL}/events`, eventData);
-      success.value = 'Wydarzenie dodane';
+      success.value = authStore.isAuthenticated 
+        ? 'Wydarzenie dodane' 
+        : 'Wydarzenie dodane (jako anonim)';
     }
     
     await fetchEvents();
@@ -231,3 +281,33 @@ watch(currentYear, () => {
   fetchHolidays();
 });
 </script>
+
+<style scoped>
+/* Istniejące style... */
+
+/* DODANO: Styl dla badge anonimowy */
+.badge-anonymous {
+  background: #f0f0f0;
+  color: #666;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.error {
+  color: #dc3545;
+  background: #f8d7da;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.success {
+  color: #155724;
+  background: #d4edda;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+</style>

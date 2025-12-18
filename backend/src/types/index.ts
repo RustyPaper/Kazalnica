@@ -58,7 +58,7 @@ export interface PublicApartment {
 }
 
 export interface ApartmentStats {
-  id?: number; // DODANE: ID publicznego lokalu (opcjonalne, bo userzy nie mają)
+  id?: number;
   number: string;
   shareAmount?: string;
   additionalInfo?: string;
@@ -66,11 +66,10 @@ export interface ApartmentStats {
   collectionDate?: string;
   ownerName: string;
   ownerLogin: string | null;
+  userId?: string; // DODANE: ID właściciela (dla edycji przez admina)
   source: 'user' | 'public';
   phoneNumber?: string;
   email?: string;
-  ownerFirstName?: string; // DODANE: Dla edycji publicznych lokali
-  ownerLastName?: string;  // DODANE: Dla edycji publicznych lokali
+  ownerFirstName?: string;
+  ownerLastName?: string;
 }
-
-

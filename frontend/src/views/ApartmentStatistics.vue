@@ -175,7 +175,7 @@
                   <th>Status</th>
                   <th>Data odbioru</th>
                   <th>Źródło</th>
-                  <th style="width: 80px;"></th>
+                  <th style="width: 150px;">Akcje</th>
                 </tr>
               </thead>
               <tbody>
@@ -195,12 +195,23 @@
                     </span>
                   </td>
                   <td>
-                    <button
-                      v-if="apt.source === 'public' && canEditPublic"
-                      class="btn-edit"
-                      @click="editApartment(apt)">
-                      Edytuj
-                    </button>
+                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                      <!-- Przycisk edycji -->
+                      <button
+                        v-if="canEditApartment(apt)"
+                        class="btn-edit"
+                        @click="editApartment(apt)">
+                        Edytuj
+                      </button>
+                      
+                      <!-- Przycisk historii dla publicznych apartamentów -->
+                      <button
+                        v-if="apt.source === 'public' && apt.id"
+                        class="btn-history"
+                        @click="showHistory(apt.id)">
+                        📜 Historia
+                      </button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -238,6 +249,57 @@
       @updated="onApartmentUpdated"
       @close="showEditModal = false"
     />
+
+    <!-- Modal historii edycji -->
+    <div v-if="showHistoryModal" class="modal-overlay" @click.self="closeHistoryModal">
+      <div class="modal-card history-modal">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h3 style="margin: 0;">📜 Historia edycji lokalu</h3>
+          <button class="btn-close" @click="closeHistoryModal">&times;</button>
+        </div>
+        
+        <div v-if="historyLoading" style="text-align: center; padding: 40px;">
+          Ładowanie historii...
+        </div>
+        
+        <div v-else-if="historyData.length === 0" style="text-align: center; padding: 40px; color: #666;">
+          Brak historii edycji dla tego lokalu
+        </div>
+        
+        <div v-else class="history-list">
+          <div v-for="entry in historyData" :key="entry.id" class="history-entry">
+            <div class="history-header">
+              <strong>{{ formatDateTime(entry.editedAt) }}</strong>
+              <span :class="entry.editedBy === 'anonymous' ? 'badge-anonymous' : 'badge-user'">
+                {{ entry.editedBy === 'anonymous' ? 'Anonim' : entry.editedBy.replace('user:', '') }}
+              </span>
+            </div>
+            
+            <div class="history-details">
+              <div v-if="entry.ipAddress" style="font-size: 12px; color: #666;">
+                IP: {{ entry.ipAddress }}
+              </div>
+              
+              <div style="margin-top: 10px;">
+                <strong>Zmienione pola:</strong>
+                <ul style="margin: 5px 0; padding-left: 20px;">
+                  <li v-for="(value, key) in entry.changes" :key="key">
+                    <code>{{ formatFieldName(key) }}</code>: 
+                    <span class="old-value">{{ entry.oldValues[key] || '(puste)' }}</span>
+                    →
+                    <span class="new-value">{{ value || '(puste)' }}</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div style="margin-top: 20px; text-align: right;">
+          <button class="btn btn-secondary" @click="closeHistoryModal">Zamknij</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -247,7 +309,7 @@ import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
 import { API_URL } from '../config';
 import AddApartmentModal from '../components/AddApartmentModal.vue';
-import EditApartmentModal from '../components/EditApartmentModal.vue'; // NOWE
+import EditApartmentModal from '../components/EditApartmentModal.vue';
 
 const authStore = useAuthStore();
 
@@ -257,10 +319,41 @@ const loading = ref(true);
 const error = ref('');
 const success = ref('');
 const showAddModal = ref(false);
-const showEditModal = ref(false); // NOWE
-const apartmentToEdit = ref<any>(null); // NOWE
-const canEditPublic = ref(true);
+const showEditModal = ref(false);
+const apartmentToEdit = ref<any>(null);
 const selectedStatusFilter = ref('');
+
+// Zmienne dla historii
+const showHistoryModal = ref(false);
+const historyData = ref<any[]>([]);
+const historyLoading = ref(false);
+const historyApartmentId = ref<number | null>(null);
+
+const formatFieldName = (fieldName: string): string => {
+  const labels: Record<string, string> = {
+    apartmentNumber: 'Numer lokalu',
+    ownerFirstName: 'Imię',
+    ownerLastName: 'Nazwisko',
+    phoneNumber: 'Telefon',
+    email: 'Email',
+    shareAmount: 'Udziały',
+    status: 'Status',
+    collectionDate: 'Data odbioru',
+    additionalInfo: 'Dodatkowe informacje'
+  };
+  return labels[fieldName] || fieldName;
+};
+
+const formatDateTime = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleString('pl-PL', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
 
 const fetchStatistics = async () => {
   try {
@@ -320,7 +413,7 @@ const getStatusLabel = (status?: string): string => {
 };
 
 const getStatusShares = (status: string): number => {
-  if (!statistics.value) return 0;
+  if (!statistics.value?.statusGroups) return 0;
   const groupKey = status === 'no_status' ? 'no_status' : status;
   const group = statistics.value.statusGroups[groupKey] || [];
   return group.reduce((sum: number, apt: any) => {
@@ -329,17 +422,14 @@ const getStatusShares = (status: string): number => {
 };
 
 const getStatusPercentage = (status: string): string => {
-  if (!statistics.value) return '0.00';
+  if (!statistics.value?.totalSharesTarget) return '0.00';
   const shares = getStatusShares(status);
   const percentage = (shares / statistics.value.totalSharesTarget) * 100;
   return percentage.toFixed(2);
 };
 
 const filterByStatus = (status: string) => {
-  selectedStatusFilter.value = status === 'no_status' ? '' : status;
-  if (status === 'no_status') {
-    selectedStatusFilter.value = 'no_status';
-  }
+  selectedStatusFilter.value = status;
 };
 
 const clearFilter = () => {
@@ -347,13 +437,15 @@ const clearFilter = () => {
 };
 
 const filteredApartments = computed(() => {
-  if (!statistics.value) return [];
+  if (!statistics.value?.apartments) return [];
   if (!selectedStatusFilter.value) return statistics.value.apartments;
   if (selectedStatusFilter.value === 'no_status') {
     return statistics.value.apartments.filter((apt: any) => !apt.status);
   }
   
-  return statistics.value.apartments.filter((apt: any) => apt.status === selectedStatusFilter.value);
+  return statistics.value.apartments.filter(
+    (apt: any) => apt.status === selectedStatusFilter.value
+  );
 });
 
 const filteredTotalShares = computed(() => {
@@ -362,22 +454,57 @@ const filteredTotalShares = computed(() => {
   }, 0);
 });
 
+const canEditApartment = (apt: any): boolean => {
+  if (apt.source === 'public') return true;
+  if (!authStore.isAuthenticated) return false;
+  if (authStore.isAdmin) return true;
+  if (apt.source === 'user' && apt.ownerLogin === authStore.user?.login) return true;
+  return false;
+};
+
 const onApartmentAdded = () => {
   fetchStatistics();
   showAddModal.value = false;
 };
 
-// NOWA funkcja edycji
 const editApartment = (apt: any) => {
-  apartmentToEdit.value = apt;
+  apartmentToEdit.value = {
+    ...apt,
+    _source: apt.source,
+    _ownerLogin: apt.ownerLogin,
+    _originalNumber: apt.number,
+    _id: apt.id,
+    _userId: apt.userId
+  };
   showEditModal.value = true;
 };
 
-// NOWA funkcja po aktualizacji
 const onApartmentUpdated = () => {
   fetchStatistics();
   showEditModal.value = false;
   apartmentToEdit.value = null;
+};
+
+const showHistory = async (aptId: number) => {
+  try {
+    historyLoading.value = true;
+    historyApartmentId.value = aptId;
+    
+    const response = await axios.get(`${API_URL}/public-apartments/${aptId}/history`);
+    historyData.value = response.data;
+    showHistoryModal.value = true;
+  } catch (err: any) {
+    console.error('Błąd pobierania historii:', err);
+    error.value = err.response?.data?.error || 'Błąd pobierania historii edycji';
+  } finally {
+    historyLoading.value = false;
+  }
+};
+
+const closeHistoryModal = () => {
+  showHistoryModal.value = false;
+  historyData.value = [];
+  historyApartmentId.value = null;
 };
 
 onMounted(async () => {
@@ -387,6 +514,155 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* ========================================
+   MODAL STYLES
+   ======================================== */
+
+/* Overlay - przyciemnione tło */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+/* Card - białe okienko */
+.modal-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 600px;
+  position: relative;
+  margin: auto;
+}
+
+/* Modal historii - specjalne wymiary */
+.history-modal {
+  max-width: 700px;
+  max-height: 80vh;
+  overflow-y: auto;
+  background-color: #ffffff;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.history-entry {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 15px;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.history-details {
+  font-size: 14px;
+  color: #333;
+}
+
+.history-details ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 5px 0;
+}
+
+.history-details li {
+  padding: 5px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.history-details li:last-child {
+  border-bottom: none;
+}
+
+.old-value {
+  color: #dc3545;
+  text-decoration: line-through;
+  font-weight: 500;
+}
+
+.new-value {
+  color: #28a745;
+  font-weight: 600;
+}
+
+code {
+  background: #e9ecef;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
+  color: #333;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 32px;
+  cursor: pointer;
+  color: #999;
+  line-height: 1;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  transition: color 0.2s;
+}
+
+.btn-close:hover {
+  color: #333;
+}
+
+.btn-history {
+  background: #17a2b8;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.btn-history:hover {
+  background: #138496;
+}
+
+.badge-anonymous {
+  background: #f0f0f0;
+  color: #666;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ========================================
+   MAIN STYLES
+   ======================================== */
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -607,6 +883,11 @@ onMounted(async () => {
   color: #155724;
 }
 
+.status-smr {
+  background-color: #e7e7ff;
+  color: #4a4aff;
+}
+
 .status-none {
   background-color: #e2e3e5;
   color: #383d41;
@@ -650,6 +931,7 @@ onMounted(async () => {
   font-size: 13px;
   font-weight: 500;
   transition: background 0.2s;
+  white-space: nowrap;
 }
 
 .btn-edit:hover {
@@ -672,24 +954,25 @@ onMounted(async () => {
   background: #218838;
 }
 
-@media (max-width: 768px) {
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .status-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .table-container {
-    font-size: 14px;
-  }
-  
-  .apartments-table th,
-  .apartments-table td {
-    padding: 8px;
-  }
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.2s;
 }
+
+.btn-secondary:hover {
+  background: #5a6268;
+}
+
+/* ========================================
+   RESPONSIVE STYLES
+   ======================================== */
 
 @media (max-width: 1024px) {
   .stats-grid {
@@ -745,9 +1028,31 @@ onMounted(async () => {
     font-size: 13px;
   }
   
-  .btn-edit {
+  .btn-edit,
+  .btn-history {
     padding: 4px 8px;
-    font-size: 12px;
+    font-size: 11px;
+  }
+
+  .modal-overlay {
+    padding: 10px;
+  }
+  
+  .modal-card {
+    padding: 20px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  .history-modal {
+    max-width: 95%;
+    padding: 15px;
+  }
+  
+  .history-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
   }
 }
 
@@ -810,9 +1115,22 @@ onMounted(async () => {
     margin-bottom: 10px;
   }
 
-  .status-smr {
-  background-color: #e7e7ff;
-  color: #4a4aff;
+  .btn-edit,
+  .btn-history {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+
+  .modal-card {
+    padding: 15px;
+  }
+
+  .btn-close {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
   }
 }
 </style>
+
+
