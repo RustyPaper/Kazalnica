@@ -169,7 +169,10 @@
             <table class="apartments-table">
               <thead>
                 <tr>
-                  <th>Numer lokalu</th>
+                  <th @click="toggleSort('number')" style="cursor: pointer;">
+                    Numer lokalu
+                    <span v-if="sortBy === 'number'">{{ sortOrder === 'asc' ? '▲' : '▼' }}</span>
+                  </th>
                   <th>Właściciel</th>
                   <th>Udziały</th>
                   <th>Status</th>
@@ -348,6 +351,19 @@ const historyData = ref<any[]>([]);
 const historyLoading = ref(false);
 const historyApartmentId = ref<number | null>(null);
 
+// Zmienne dla sortowania
+const sortBy = ref<string>('number');
+const sortOrder = ref<'asc' | 'desc'>('asc');
+
+const toggleSort = (column: string) => {
+  if (sortBy.value === column) {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortBy.value = column;
+    sortOrder.value = 'asc';
+  }
+};
+
 const formatFieldName = (fieldName: string): string => {
   const labels: Record<string, string> = {
     apartmentNumber: 'Numer lokalu',
@@ -371,6 +387,56 @@ const formatDateTime = (dateString: string): string => {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit'
+  });
+};
+
+// 🆕 Funkcja sortująca (identyczna jak backend)
+const sortApartmentsByNumber = (apartments: any[]): any[] => {
+  return [...apartments].sort((a, b) => {
+    const numberA = a.number.trim().toUpperCase();
+    const numberB = b.number.trim().toUpperCase();
+
+    const parseApartmentNumber = (num: string) => {
+      const cleaned = num.replace(/\s+/g, '');
+      const match = cleaned.match(/^D\.(-?\d+)\.(.+)$/i);
+      
+      if (!match) {
+        return { floor: 999, room: 999, isU: false, original: num };
+      }
+
+      const floor = parseInt(match[1], 10);
+      const roomPart = match[2];
+      const isU = /^U\d+$/i.test(roomPart);
+      
+      if (isU) {
+        const roomNumber = parseInt(roomPart.substring(1), 10);
+        return { floor, room: roomNumber, isU: true, original: num };
+      }
+
+      const room = parseInt(roomPart, 10);
+      
+      if (isNaN(room)) {
+        return { floor, room: 999, isU: false, original: num };
+      }
+
+      return { floor, room, isU: false, original: num };
+    };
+
+    const parsedA = parseApartmentNumber(numberA);
+    const parsedB = parseApartmentNumber(numberB);
+
+    if (parsedA.isU && !parsedB.isU) return 1;
+    if (!parsedA.isU && parsedB.isU) return -1;
+
+    if (parsedA.floor !== parsedB.floor) {
+      return parsedA.floor - parsedB.floor;
+    }
+
+    if (parsedA.room !== parsedB.room) {
+      return parsedA.room - parsedB.room;
+    }
+
+    return parsedA.original.localeCompare(parsedB.original);
   });
 };
 
@@ -457,14 +523,28 @@ const clearFilter = () => {
 
 const filteredApartments = computed(() => {
   if (!statistics.value?.apartments) return [];
-  if (!selectedStatusFilter.value) return statistics.value.apartments;
-  if (selectedStatusFilter.value === 'no_status') {
-    return statistics.value.apartments.filter((apt: any) => !apt.status);
-  }
   
-  return statistics.value.apartments.filter(
-    (apt: any) => apt.status === selectedStatusFilter.value
-  );
+  let filtered: any[] = [];
+  
+  if (!selectedStatusFilter.value) {
+    filtered = statistics.value.apartments;
+  } else if (selectedStatusFilter.value === 'no_status') {
+    filtered = statistics.value.apartments.filter((apt: any) => !apt.status);
+  } else {
+    filtered = statistics.value.apartments.filter(
+      (apt: any) => apt.status === selectedStatusFilter.value
+    );
+  }
+
+  // Sortuj
+  let sorted = sortApartmentsByNumber(filtered);
+  
+  // Odwróć jeśli DESC
+  if (sortOrder.value === 'desc') {
+    sorted = sorted.reverse();
+  }
+
+  return sorted;
 });
 
 const filteredTotalShares = computed(() => {
@@ -781,6 +861,26 @@ code {
 .btn-edit-locked:hover {
   background: #c82333 !important;
   border-color: #a71d2a;
+}
+
+/* Sortowalne nagłówki */
+.apartments-table th[style*="cursor: pointer"] {
+  user-select: none;
+  position: relative;
+  padding-right: 25px;
+}
+
+.apartments-table th[style*="cursor: pointer"]:hover {
+  background-color: #e9ecef;
+}
+
+.apartments-table th[style*="cursor: pointer"] span {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: #667eea;
 }
 
 /* ========================================

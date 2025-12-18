@@ -5,7 +5,15 @@
       <form @submit.prevent="submit">
         <div class="form-group">
           <label>Numer lokalu*:</label>
-          <input v-model="form.apartmentNumber" required />
+          <input 
+            v-model="form.apartmentNumber" 
+            required 
+            placeholder="D.3.21 lub D.-1.5"
+            @blur="validateApartmentNumber"
+          />
+          <small v-if="apartmentNumberHint" :class="apartmentNumberHintClass">
+            {{ apartmentNumberHint }}
+          </small>
         </div>
         
         <div class="form-group">
@@ -100,6 +108,39 @@ async function submit() {
     errorMsg.value = e.response?.data?.error || 'Nie udało się dodać lokalu.'
   }
 }
+
+const apartmentNumberHint = ref('');
+const apartmentNumberHintClass = ref('');
+
+const validateApartmentNumber = () => {
+  const num = form.value.apartmentNumber.trim();
+  
+  // Sprawdź czy pasuje do formatu D.x.x
+  const standardMatch = num.match(/^D\.(-?\d+)\.(\d+)$/i);
+  const uMatch = num.match(/^D\.(-?\d+)\.U(\d+)$/i);
+  
+  if (standardMatch) {
+    const floor = parseInt(standardMatch[1], 10);
+    const room = parseInt(standardMatch[2], 10);
+    
+    if (floor >= -1 && floor <= 5 && room >= 0 && room <= 40) {
+      apartmentNumberHint.value = '✓ Poprawny format';
+      apartmentNumberHintClass.value = 'hint-success';
+    } else {
+      apartmentNumberHint.value = '⚠ Piętro powinno być od -1 do 5, pokój od 0 do 40';
+      apartmentNumberHintClass.value = 'hint-warning';
+    }
+  } else if (uMatch) {
+    apartmentNumberHint.value = '✓ Format "U" - zostanie umieszczony na końcu listy';
+    apartmentNumberHintClass.value = 'hint-info';
+  } else if (num) {
+    apartmentNumberHint.value = '💡 Sugerowany format: D.piętro.pokój (np. D.3.21)';
+    apartmentNumberHintClass.value = 'hint-info';
+  } else {
+    apartmentNumberHint.value = '';
+  }
+};
+
 </script>
 
 <style scoped>
@@ -202,6 +243,27 @@ async function submit() {
 
 .btn-secondary:hover {
   background: #5a6268;
+}
+
+small.hint-success {
+  color: #28a745;
+  font-size: 12px;
+  margin-top: 5px;
+  display: block;
+}
+
+small.hint-warning {
+  color: #ffc107;
+  font-size: 12px;
+  margin-top: 5px;
+  display: block;
+}
+
+small.hint-info {
+  color: #17a2b8;
+  font-size: 12px;
+  margin-top: 5px;
+  display: block;
 }
 
 @media (max-width: 480px) {

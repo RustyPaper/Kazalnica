@@ -6,6 +6,71 @@ import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
 
+// 🆕 Funkcja sortująca lokale wg formatu D.x.x
+const sortApartmentsByNumber = (apartments: ApartmentStats[]): ApartmentStats[] => {
+  return apartments.sort((a, b) => {
+    const numberA = a.number.trim().toUpperCase();
+    const numberB = b.number.trim().toUpperCase();
+
+    // Parsuj format D.x.x lub D.x.Ux
+    const parseApartmentNumber = (num: string) => {
+      // Usuń spacje
+      const cleaned = num.replace(/\s+/g, '');
+      
+      // Sprawdź czy pasuje do formatu D.x.x lub D.x.Ux
+      const match = cleaned.match(/^D\.(-?\d+)\.(.+)$/i);
+      
+      if (!match) {
+        // Jeśli nie pasuje do formatu, zwróć wartości które wyślą na koniec
+        return { floor: 999, room: 999, isU: false, original: num };
+      }
+
+      const floor = parseInt(match[1], 10);
+      const roomPart = match[2];
+
+      // Sprawdź czy to format "Ux" (np. U12)
+      const isU = /^U\d+$/i.test(roomPart);
+      
+      if (isU) {
+        // Format D.x.Ux - wyślij na koniec
+        const roomNumber = parseInt(roomPart.substring(1), 10);
+        return { floor, room: roomNumber, isU: true, original: num };
+      }
+
+      // Standardowy format D.x.x
+      const room = parseInt(roomPart, 10);
+      
+      if (isNaN(room)) {
+        // Jeśli druga część nie jest liczbą, wyślij na koniec
+        return { floor, room: 999, isU: false, original: num };
+      }
+
+      return { floor, room, isU: false, original: num };
+    };
+
+    const parsedA = parseApartmentNumber(numberA);
+    const parsedB = parseApartmentNumber(numberB);
+
+    // Sortowanie:
+    // 1. D.x.Ux na końcu (isU = true)
+    if (parsedA.isU && !parsedB.isU) return 1;
+    if (!parsedA.isU && parsedB.isU) return -1;
+
+    // 2. Sortuj wg piętra (floor)
+    if (parsedA.floor !== parsedB.floor) {
+      return parsedA.floor - parsedB.floor;
+    }
+
+    // 3. Sortuj wg numeru pokoju (room)
+    if (parsedA.room !== parsedB.room) {
+      return parsedA.room - parsedB.room;
+    }
+
+    // 4. Jeśli wszystko równe, sortuj alfabetycznie
+    return parsedA.original.localeCompare(parsedB.original);
+  });
+};
+
 // Get apartments statistics - PUBLICZNE
 router.get('/apartments', async (req: Request, res: Response) => {
   try {
@@ -26,11 +91,11 @@ router.get('/apartments', async (req: Request, res: Response) => {
           collectionDate: apt.collectionDate,
           ownerName: `${user.firstName} ${user.lastName || ''}`.trim(),
           ownerLogin: user.login,
-          userId: user.id, // ID użytkownika dla edycji przez admina
+          userId: user.id,
           source: "user",
           phoneNumber: user.phoneNumber,
           email: user.email,
-          isLocked: false // 🆕 Lokale użytkowników nie są lockowane
+          isLocked: false
         });
       });
     });
@@ -39,7 +104,7 @@ router.get('/apartments', async (req: Request, res: Response) => {
     const publicApartments = await getAllPublicApartments();
     publicApartments.forEach(apt => {
       allApartments.push({
-        id: apt.id, // ID dla edycji
+        id: apt.id,
         number: apt.apartmentNumber,
         shareAmount: apt.shareAmount,
         additionalInfo: apt.additionalInfo,
@@ -50,15 +115,18 @@ router.get('/apartments', async (req: Request, res: Response) => {
         source: "public",
         phoneNumber: apt.phoneNumber,
         email: apt.email,
-        ownerFirstName: apt.ownerFirstName, // Dla edycji
-        ownerLastName: apt.ownerLastName,   // Dla edycji
-        isLocked: apt.isLocked || false      // 🆕 DODANE: Status blokady
+        ownerFirstName: apt.ownerFirstName,
+        ownerLastName: apt.ownerLastName,
+        isLocked: apt.isLocked || false
       });
     });
 
+    // 🆕 POSORTUJ LOKALE
+    const sortedApartments = sortApartmentsByNumber(allApartments);
+
     // Oblicz sumę udziałów
     let totalShares = 0;
-    allApartments.forEach(apt => {
+    sortedApartments.forEach(apt => {
       const shareAmount = parseFloat(apt.shareAmount || '0');
       if (!isNaN(shareAmount)) {
         totalShares += shareAmount;
@@ -67,32 +135,31 @@ router.get('/apartments', async (req: Request, res: Response) => {
 
     // Grupuj według statusu
     const statusGroups = {
-      lease_agreement: allApartments.filter(apt => apt.status === 'lease_agreement'),
-      notice_sent: allApartments.filter(apt => apt.status === 'notice_sent'),
-      collection_date: allApartments.filter(apt => apt.status === 'collection_date'),
-      collected: allApartments.filter(apt => apt.status === 'collected'),
-      smr: allApartments.filter(apt => apt.status === 'smr'),
-      no_status: allApartments.filter(apt => !apt.status)
+      lease_agreement: sortedApartments.filter(apt => apt.status === 'lease_agreement'),
+      notice_sent: sortedApartments.filter(apt => apt.status === 'notice_sent'),
+      collection_date: sortedApartments.filter(apt => apt.status === 'collection_date'),
+      collected: sortedApartments.filter(apt => apt.status === 'collected'),
+      smr: sortedApartments.filter(apt => apt.status === 'smr'),
+      no_status: sortedApartments.filter(apt => !apt.status)
     };
 
     // Dolicz, ile z każdego źródła
     const sourceCounts = {
-      user: allApartments.filter(apt => apt.source === 'user').length,
-      public: allApartments.filter(apt => apt.source === 'public').length
+      user: sortedApartments.filter(apt => apt.source === 'user').length,
+      public: sortedApartments.filter(apt => apt.source === 'public').length
     };
 
-    // 🆕 DODANE: Statystyki lockowania
     const lockStats = {
-      locked: allApartments.filter(apt => apt.isLocked === true).length,
-      unlocked: allApartments.filter(apt => apt.isLocked === false || apt.isLocked === undefined).length
+      locked: sortedApartments.filter(apt => apt.isLocked === true).length,
+      unlocked: sortedApartments.filter(apt => apt.isLocked === false || apt.isLocked === undefined).length
     };
 
     res.json({
       totalSharesTarget,
       totalShares,
       sharePercentage: totalSharesTarget > 0 ? (totalShares / totalSharesTarget) * 100 : 0,
-      totalApartments: allApartments.length,
-      apartments: allApartments,
+      totalApartments: sortedApartments.length,
+      apartments: sortedApartments, // 🆕 Już posortowane
       statusGroups,
       statusCounts: {
         lease_agreement: statusGroups.lease_agreement.length,
@@ -103,7 +170,7 @@ router.get('/apartments', async (req: Request, res: Response) => {
         no_status: statusGroups.no_status.length
       },
       sourceCounts,
-      lockStats // 🆕 DODANE: Statystyki lockowania
+      lockStats
     });
 
   } catch (error) {
