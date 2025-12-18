@@ -1,3 +1,4 @@
+import backupRoutes from './routes/backup';
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
@@ -39,6 +40,7 @@ app.use('/api/permissions', permissionsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/statistics', statisticsRoutes);
 app.use('/api/public-apartments', publicApartmentsRouter);
+app.use('/api/backup', backupRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

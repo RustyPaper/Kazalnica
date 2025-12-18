@@ -50,6 +50,14 @@
                 🔐 Uprawnienia
               </router-link>
             </li>
+
+              <!-- Tylko dla admina -->
+            <li v-if="authStore.isAdmin">
+              <router-link to="/backup" :class="{ active: $route.path === '/backup' }" @click="closeMenu">
+                💾 Backup
+              </router-link>
+            </li>
+
             <li>
               <a href="#" @click.prevent="logout">🚪 Wyloguj</a>
             </li>

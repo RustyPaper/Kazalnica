@@ -6,6 +6,7 @@ import Calendar from '../views/Calendar.vue';
 import Profile from '../views/Profile.vue';
 import Permissions from '../views/Permissions.vue';
 import ApartmentStatistics from '../views/ApartmentStatistics.vue';
+import BackupView from '../views/BackupView.vue'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -43,6 +44,12 @@ const routes: RouteRecordRaw[] = [
     name: 'Calendar', // ZMIENIONO: Kalendarz jako podstrona
     component: Calendar,
     meta: { requiresAuth: false },
+  },
+  {
+    path: '/backup',
+    name: 'Backup',
+    component: BackupView,
+    meta: { requiresAuth: true, requiresAdmin: true }
   },
 ];
 
