@@ -3,6 +3,11 @@
     <div class="modal-card">
       <h3>Edytuj lokal</h3>
       
+      <!-- 🆕 Ostrzeżenie o zablokowanym lokalu -->
+      <div v-if="apartment.isLocked" class="lock-warning">
+        🔒 <strong>Lokal zablokowany</strong> - tylko administrator może edytować
+      </div>
+
       <!-- Info dla admina edytującego lokal użytkownika -->
       <div v-if="apartment._source === 'user' && authStore.isAdmin" class="admin-notice">
         ⚠️ Edytujesz lokal użytkownika: <strong>{{ apartment.ownerName }}</strong>
@@ -364,5 +369,23 @@ async function submit() {
   .btn {
     width: 100%;
   }
+
+  .lock-warning {
+  background: #ffe0e0;
+  border: 2px solid #dc3545;
+  color: #721c24;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lock-warning strong {
+  color: #dc3545;
+}
+
 }
 </style>

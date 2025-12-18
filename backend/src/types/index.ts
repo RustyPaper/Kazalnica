@@ -54,6 +54,7 @@ export interface PublicApartment {
   status?: 'lease_agreement' | 'notice_sent' | 'collection_date' | 'collected' | 'smr';
   collectionDate?: string;
   additionalInfo?: string;
+  isLocked?: boolean;
   createdAt: string;
 }
 
@@ -72,4 +73,5 @@ export interface ApartmentStats {
   email?: string;
   ownerFirstName?: string;
   ownerLastName?: string;
+  isLocked?: boolean;
 }

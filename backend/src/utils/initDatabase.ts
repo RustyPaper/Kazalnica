@@ -1,5 +1,6 @@
 import pool from '../config/database';
 import { migrateInitialData } from './migrateData';
+import { addLockColumn } from './migrations/addLockColumn'; // 🆕 DODANE
 
 export const initDatabase = async () => {
   const client = await pool.connect();
@@ -45,7 +46,7 @@ export const initDatabase = async () => {
       );
     `);
 
-        // Tabela publicznych lokali (zgłoszenia anonimowe)
+    // Tabela publicznych lokali (zgłoszenia anonimowe)
     await client.query(`
       CREATE TABLE IF NOT EXISTS public_apartments (
         id SERIAL PRIMARY KEY,
@@ -62,7 +63,7 @@ export const initDatabase = async () => {
       );
     `);
 
-        // Tabela historii edycji publicznych lokali
+    // Tabela historii edycji publicznych lokali
     await client.query(`
       CREATE TABLE IF NOT EXISTS public_apartments_edit_history (
         id SERIAL PRIMARY KEY,
@@ -76,11 +77,13 @@ export const initDatabase = async () => {
       );
     `);
 
-await client.query(`
-  CREATE INDEX IF NOT EXISTS idx_edit_history_apartment ON public_apartments_edit_history(apartment_id);
-  CREATE INDEX IF NOT EXISTS idx_edit_history_date ON public_apartments_edit_history(edited_at);
-`);
+    // Indeksy dla historii edycji
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_edit_history_apartment ON public_apartments_edit_history(apartment_id);
+      CREATE INDEX IF NOT EXISTS idx_edit_history_date ON public_apartments_edit_history(edited_at);
+    `);
 
+    // Indeks dla numerów lokali
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_public_apartments_number ON public_apartments(apartment_number);
     `);
@@ -96,6 +99,9 @@ await client.query(`
 
     // Migracja początkowych danych
     await migrateInitialData();
+
+    // 🆕 DODANE: Migracja kolumny lockowania
+    await addLockColumn();
 
   } catch (error) {
     console.error('❌ Błąd tworzenia tabel:', error);

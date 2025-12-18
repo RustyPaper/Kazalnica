@@ -175,6 +175,7 @@
                   <th>Status</th>
                   <th>Data odbioru</th>
                   <th>Źródło</th>
+                  <th v-if="authStore.isAdmin" style="width: 60px;">🔒</th>
                   <th style="width: 150px;">Akcje</th>
                 </tr>
               </thead>
@@ -194,19 +195,35 @@
                       {{ apt.source === 'public' ? 'Publiczny' : 'Użytkownik' }}
                     </span>
                   </td>
+
+                  <!-- Kolumna lockowania -->
+                  <td v-if="authStore.isAdmin">
+                    <button
+                      v-if="apt.source === 'public' && apt.id"
+                      @click="toggleLock(apt)"
+                      class="btn-lock"
+                      :class="{ 'locked': apt.isLocked }"
+                      :title="apt.isLocked ? 'Odblokuj lokal' : 'Zablokuj lokal'"
+                    >
+                      {{ apt.isLocked ? '🔒' : '🔓' }}
+                    </button>
+                  </td>
+
+                  <!-- Kolumna akcji -->
                   <td>
                     <div style="display: flex; gap: 5px; flex-wrap: wrap;">
                       <!-- Przycisk edycji -->
                       <button
                         v-if="canEditApartment(apt)"
                         class="btn-edit"
+                        :class="{ 'btn-edit-locked': apt.isLocked && authStore.isAdmin }"
                         @click="editApartment(apt)">
-                        Edytuj
+                        {{ apt.isLocked && authStore.isAdmin ? '🔒 Edytuj' : 'Edytuj' }}
                       </button>
-                      
-                      <!-- Przycisk historii dla publicznych apartamentów -->
+
+                      <!-- Przycisk historii - tylko dla admina -->
                       <button
-                        v-if="apt.source === 'public' && apt.id"
+                        v-if="apt.source === 'public' && apt.id && authStore.isAdmin"
                         class="btn-history"
                         @click="showHistory(apt.id)">
                         📜 Historia
@@ -217,9 +234,11 @@
               </tbody>
               <tfoot>
                 <tr class="total-row">
-                  <td colspan="2"><strong>SUMA {{ selectedStatusFilter ? '(filtrowane)' : '' }}</strong></td>
+                  <td :colspan="authStore.isAdmin ? 3 : 2">
+                    <strong>SUMA {{ selectedStatusFilter ? '(filtrowane)' : '' }}</strong>
+                  </td>
                   <td class="shares-cell"><strong>{{ formatNumber(filteredTotalShares) }}</strong></td>
-                  <td colspan="4"></td>
+                  <td :colspan="authStore.isAdmin ? 4 : 3"></td>
                 </tr>
               </tfoot>
             </table>
@@ -281,7 +300,7 @@
               </div>
               
               <div style="margin-top: 10px;">
-                <strong>Zmienione pola:</strong>
+                               <strong>Zmienione pola:</strong>
                 <ul style="margin: 5px 0; padding-left: 20px;">
                   <li v-for="(value, key) in entry.changes" :key="key">
                     <code>{{ formatFieldName(key) }}</code>: 
@@ -454,11 +473,23 @@ const filteredTotalShares = computed(() => {
   }, 0);
 });
 
+// 🆕 ZAKTUALIZOWANA funkcja canEditApartment
 const canEditApartment = (apt: any): boolean => {
-  if (apt.source === 'public') return true;
+  // Publiczne lokale
+  if (apt.source === 'public') {
+    // Jeśli zablokowany - tylko admin
+    if (apt.isLocked) {
+      return authStore.isAdmin || false;
+    }
+    // Jeśli odblokowany - wszyscy
+    return true;
+  }
+  
+  // Lokale użytkowników
   if (!authStore.isAuthenticated) return false;
   if (authStore.isAdmin) return true;
   if (apt.source === 'user' && apt.ownerLogin === authStore.user?.login) return true;
+  
   return false;
 };
 
@@ -467,6 +498,7 @@ const onApartmentAdded = () => {
   showAddModal.value = false;
 };
 
+// 🆕 POPRAWIONA funkcja editApartment - przekazanie isLocked
 const editApartment = (apt: any) => {
   apartmentToEdit.value = {
     ...apt,
@@ -474,7 +506,8 @@ const editApartment = (apt: any) => {
     _ownerLogin: apt.ownerLogin,
     _originalNumber: apt.number,
     _id: apt.id,
-    _userId: apt.userId
+    _userId: apt.userId,
+    isLocked: apt.isLocked // 🆕 DODANE: Przekaż status blokady
   };
   showEditModal.value = true;
 };
@@ -485,12 +518,21 @@ const onApartmentUpdated = () => {
   apartmentToEdit.value = null;
 };
 
+// 🆕 POPRAWIONA funkcja showHistory - dodano token autoryzacji
 const showHistory = async (aptId: number) => {
   try {
     historyLoading.value = true;
     historyApartmentId.value = aptId;
     
-    const response = await axios.get(`${API_URL}/public-apartments/${aptId}/history`);
+    const response = await axios.get(
+      `${API_URL}/public-apartments/${aptId}/history`,
+      {
+        headers: {
+          Authorization: `Bearer ${authStore.token}` // 🆕 DODANE: Token
+        }
+      }
+    );
+    
     historyData.value = response.data;
     showHistoryModal.value = true;
   } catch (err: any) {
@@ -505,6 +547,48 @@ const closeHistoryModal = () => {
   showHistoryModal.value = false;
   historyData.value = [];
   historyApartmentId.value = null;
+};
+
+// 🆕 NOWA funkcja toggleLock
+const toggleLock = async (apt: any) => {
+  if (!authStore.isAdmin) {
+    error.value = 'Tylko administrator może blokować lokale';
+    return;
+  }
+
+  if (apt.source !== 'public' || !apt.id) {
+    error.value = 'Można blokować tylko publiczne lokale';
+    return;
+  }
+
+  try {
+    const response = await axios.put(
+      `${API_URL}/public-apartments/${apt.id}/lock`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${authStore.token}`
+        }
+      }
+    );
+
+    const newLockState = response.data.isLocked;
+    
+    success.value = newLockState 
+      ? `🔒 Lokal ${apt.number} został zablokowany`
+      : `🔓 Lokal ${apt.number} został odblokowany`;
+    
+    // Odśwież statystyki
+    await fetchStatistics();
+    
+    setTimeout(() => {
+      success.value = '';
+    }, 3000);
+
+  } catch (err: any) {
+    console.error('Błąd lockowania:', err);
+    error.value = err.response?.data?.error || 'Błąd zmiany stanu blokady';
+  }
 };
 
 onMounted(async () => {
@@ -659,6 +743,46 @@ code {
   font-weight: 600;
 }
 
+/* 🔒 Lock button styles */
+.btn-lock {
+  background: transparent;
+  border: 2px solid #6c757d;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.2s;
+  min-width: 40px;
+  height: 32px;
+}
+
+.btn-lock:hover {
+  background: #f8f9fa;
+  transform: scale(1.1);
+}
+
+.btn-lock.locked {
+  border-color: #dc3545;
+  background: #fff5f5;
+}
+
+.btn-lock.locked:hover {
+  background: #ffe0e0;
+  border-color: #c82333;
+}
+
+/* 🔒 Locked edit button */
+.btn-edit-locked {
+  background: #dc3545 !important;
+  color: white !important;
+  border: 2px solid #bd2130;
+}
+
+.btn-edit-locked:hover {
+  background: #c82333 !important;
+  border-color: #a71d2a;
+}
+
 /* ========================================
    MAIN STYLES
    ======================================== */
@@ -751,6 +875,7 @@ code {
   border-radius: 8px;
   border: 2px solid #dee2e6;
   transition: all 0.2s;
+  cursor: pointer;
 }
 
 .status-card:hover {
@@ -970,6 +1095,38 @@ code {
   background: #5a6268;
 }
 
+.btn-primary {
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.btn-primary:hover {
+  background: #5568d3;
+}
+
+.error {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #f5c6cb;
+}
+
+.success {
+  background: #d4edda;
+  color: #155724;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #c3e6cb;
+}
+
 /* ========================================
    RESPONSIVE STYLES
    ======================================== */
@@ -1015,7 +1172,7 @@ code {
   }
 
   .apartments-table {
-    min-width: 700px;
+    min-width: 800px;
   }
 
   .apartments-table th,
@@ -1032,6 +1189,13 @@ code {
   .btn-history {
     padding: 4px 8px;
     font-size: 11px;
+  }
+
+  .btn-lock {
+    font-size: 16px;
+    padding: 3px 6px;
+    min-width: 35px;
+    height: 28px;
   }
 
   .modal-overlay {
@@ -1097,6 +1261,7 @@ code {
 
   .apartments-table {
     font-size: 12px;
+    min-width: 750px;
   }
 
   .apartments-table th,
@@ -1121,6 +1286,13 @@ code {
     padding: 3px 6px;
   }
 
+  .btn-lock {
+    font-size: 14px;
+    padding: 2px 4px;
+    min-width: 30px;
+    height: 24px;
+  }
+
   .modal-card {
     padding: 15px;
   }
@@ -1133,4 +1305,4 @@ code {
 }
 </style>
 
-
+ 

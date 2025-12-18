@@ -26,10 +26,11 @@ router.get('/apartments', async (req: Request, res: Response) => {
           collectionDate: apt.collectionDate,
           ownerName: `${user.firstName} ${user.lastName || ''}`.trim(),
           ownerLogin: user.login,
-          userId: user.id, // DODANE: ID użytkownika dla edycji przez admina
+          userId: user.id, // ID użytkownika dla edycji przez admina
           source: "user",
           phoneNumber: user.phoneNumber,
-          email: user.email
+          email: user.email,
+          isLocked: false // 🆕 Lokale użytkowników nie są lockowane
         });
       });
     });
@@ -50,7 +51,8 @@ router.get('/apartments', async (req: Request, res: Response) => {
         phoneNumber: apt.phoneNumber,
         email: apt.email,
         ownerFirstName: apt.ownerFirstName, // Dla edycji
-        ownerLastName: apt.ownerLastName     // Dla edycji
+        ownerLastName: apt.ownerLastName,   // Dla edycji
+        isLocked: apt.isLocked || false      // 🆕 DODANE: Status blokady
       });
     });
 
@@ -79,6 +81,12 @@ router.get('/apartments', async (req: Request, res: Response) => {
       public: allApartments.filter(apt => apt.source === 'public').length
     };
 
+    // 🆕 DODANE: Statystyki lockowania
+    const lockStats = {
+      locked: allApartments.filter(apt => apt.isLocked === true).length,
+      unlocked: allApartments.filter(apt => apt.isLocked === false || apt.isLocked === undefined).length
+    };
+
     res.json({
       totalSharesTarget,
       totalShares,
@@ -94,16 +102,17 @@ router.get('/apartments', async (req: Request, res: Response) => {
         smr: statusGroups.smr.length,
         no_status: statusGroups.no_status.length
       },
-      sourceCounts
+      sourceCounts,
+      lockStats // 🆕 DODANE: Statystyki lockowania
     });
 
   } catch (error) {
-    console.error(error);
+    console.error('Błąd pobierania statystyk:', error);
     res.status(500).json({ error: 'Błąd serwera' });
   }
 });
 
-// NOWY: Edycja apartamentu użytkownika (tylko admin)
+// Edycja apartamentu użytkownika (tylko admin)
 router.put('/apartments/user/:userId/:apartmentNumber', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     // Sprawdź czy admin
@@ -146,6 +155,8 @@ router.put('/apartments/user/:userId/:apartmentNumber', authenticateToken, async
       return res.status(500).json({ error: 'Błąd zapisu danych' });
     }
 
+    console.log('✅ Lokal użytkownika zaktualizowany pomyślnie');
+
     res.json({
       message: 'Lokal użytkownika zaktualizowany',
       apartment: updatedUser.apartments[aptIndex],
@@ -157,7 +168,7 @@ router.put('/apartments/user/:userId/:apartmentNumber', authenticateToken, async
       }
     });
   } catch (error) {
-    console.error('❌ Update user apartment error:', error);
+    console.error('❌ Błąd edycji lokalu użytkownika:', error);
     res.status(500).json({ error: 'Błąd serwera' });
   }
 });

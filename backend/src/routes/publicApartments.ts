@@ -7,7 +7,8 @@ import {
   updatePublicApartment,
   getPublicApartmentById,
   logApartmentEdit,
-  getApartmentEditHistory
+  getApartmentEditHistory,
+  toggleLockPublicApartment
 } from '../utils/publicApartmentsStorage';
 import { authenticateToken } from '../middleware/auth';
 
@@ -84,6 +85,33 @@ router.put('/:id', editLimiter, async (req: Request, res: Response) => {
     if (!oldApartment) {
       return res.status(404).json({ error: 'Lokal nie znaleziony' });
     }
+
+    // 🆕 SPRAWDŹ CZY ZABLOKOWANY
+    const authHeader = req.headers['authorization'];
+    let isAdmin = false;
+    
+    if (authHeader) {
+      try {
+        const jwt = require('jsonwebtoken');
+        const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        
+        // Sprawdź czy admin
+        const { getUserById } = require('../utils/databaseStorage');
+        const user = await getUserById(decoded.id);
+        isAdmin = user?.role === 'admin';
+      } catch (err) {
+        isAdmin = false;
+      }
+    }
+
+    // Jeśli zablokowany i nie admin - odrzuć
+    if (oldApartment.isLocked && !isAdmin) {
+      return res.status(403).json({ 
+        error: '🔒 Ten lokal jest zablokowany i może być edytowany tylko przez administratora.' 
+      });
+    }
     
     const updates = req.body as Partial<PublicApartment>;
     
@@ -91,8 +119,6 @@ router.put('/:id', editLimiter, async (req: Request, res: Response) => {
     const ip = (req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown') as string;
     const userAgent = req.headers['user-agent'] || 'unknown';
     
-    // Sprawdź czy zalogowany
-    const authHeader = req.headers['authorization'];
     let editedBy = 'anonymous';
     
     if (authHeader) {
@@ -143,6 +169,7 @@ router.put('/:id', editLimiter, async (req: Request, res: Response) => {
   }
 });
 
+
 // Pobierz historię edycji lokalu (opcjonalnie - dla admina)
 router.get('/:id/history', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
@@ -157,6 +184,35 @@ router.get('/:id/history', authenticateToken, async (req: AuthRequest, res: Resp
     res.json(history);
   } catch (error) {
     console.error('Błąd pobierania historii:', error);
+    res.status(500).json({ error: 'Błąd serwera' });
+  }
+});
+
+// 🔒 Toggle lock/unlock apartamentu (tylko admin)
+router.put('/:id/lock', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    // Tylko admin może lockować
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ error: 'Brak uprawnień' });
+    }
+
+    const id = parseInt(req.params.id, 10);
+    
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Nieprawidłowe ID' });
+    }
+
+    const apt = await toggleLockPublicApartment(id);
+    
+    if (!apt) {
+      return res.status(404).json({ error: 'Lokal nie znaleziony' });
+    }
+
+    console.log(`🔒 Lokal #${id} ${apt.isLocked ? 'ZABLOKOWANY' : 'ODBLOKOWANY'} przez ${req.user.login}`);
+
+    res.json(apt);
+  } catch (error) {
+    console.error('Błąd lockowania:', error);
     res.status(500).json({ error: 'Błąd serwera' });
   }
 });

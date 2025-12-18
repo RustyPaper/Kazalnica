@@ -3,22 +3,30 @@ import { PublicApartment } from '../types';
 
 // Pobierz wszystkie publiczne lokale
 export const getAllPublicApartments = async (): Promise<PublicApartment[]> => {
-  const result = await pool.query(`
-    SELECT 
-      id, apartment_number as "apartmentNumber",
-      owner_first_name as "ownerFirstName",
-      owner_last_name as "ownerLastName",
-      phone_number as "phoneNumber",
-      email,
-      share_amount as "shareAmount",
-      status,
-      collection_date as "collectionDate",
-      additional_info as "additionalInfo",
-      created_at as "createdAt"
-    FROM public_apartments
-    ORDER BY created_at ASC
-  `);
-  return result.rows;
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT 
+        id, 
+        apartment_number as "apartmentNumber",
+        owner_first_name as "ownerFirstName",
+        owner_last_name as "ownerLastName",
+        phone_number as "phoneNumber",
+        email,
+        share_amount as "shareAmount",
+        status,
+        collection_date as "collectionDate",
+        additional_info as "additionalInfo",
+        is_locked as "isLocked",
+        created_at as "createdAt"
+      FROM public_apartments
+      ORDER BY created_at DESC`
+    );
+
+    return result.rows;
+  } finally {
+    client.release();
+  }
 };
 
 // Dodaj lokal publiczny
@@ -120,21 +128,32 @@ export const updatePublicApartment = async (id: number, updates: Partial<Omit<Pu
 };
 
 export const getPublicApartmentById = async (id: number): Promise<PublicApartment | null> => {
-  const result = await pool.query(
-    `SELECT id, apartment_number as "apartmentNumber",
-      owner_first_name as "ownerFirstName",
-      owner_last_name as "ownerLastName",
-      phone_number as "phoneNumber",
-      email,
-      share_amount as "shareAmount",
-      status,
-      collection_date as "collectionDate",
-      additional_info as "additionalInfo",
-      created_at as "createdAt"
-     FROM public_apartments WHERE id = $1`,
-    [id]
-  );
-  return result.rows[0] || null;
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT 
+        id, 
+        apartment_number as "apartmentNumber",
+        owner_first_name as "ownerFirstName",
+        owner_last_name as "ownerLastName",
+        phone_number as "phoneNumber",
+        email,
+        share_amount as "shareAmount",
+        status,
+        collection_date as "collectionDate",
+        additional_info as "additionalInfo",
+        is_locked as "isLocked",
+        created_at as "createdAt"
+      FROM public_apartments
+      WHERE id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) return null;
+    return result.rows[0];
+  } finally {
+    client.release();
+  }
 };
 
 // Zapisz historię edycji
@@ -178,5 +197,40 @@ export const getApartmentEditHistory = async (apartmentId: number): Promise<any[
     LIMIT 50`,
     [apartmentId]
   );
-  return result.rows;
+  return result.rows; 
 };
+
+// 🔒 Toggle lock/unlock apartamentu
+export const toggleLockPublicApartment = async (id: number): Promise<PublicApartment | null> => {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `UPDATE public_apartments 
+       SET is_locked = NOT is_locked 
+       WHERE id = $1 
+       RETURNING 
+         id, 
+         apartment_number as "apartmentNumber",
+         owner_first_name as "ownerFirstName",
+         owner_last_name as "ownerLastName",
+         phone_number as "phoneNumber",
+         email,
+         share_amount as "shareAmount",
+         status,
+         collection_date as "collectionDate",
+         additional_info as "additionalInfo",
+         is_locked as "isLocked",
+         created_at as "createdAt"`,
+      [id]
+    );
+
+    if (result.rows.length === 0) return null;
+
+    return result.rows[0];
+  } finally {
+    client.release();
+  }
+};
+
+
+
