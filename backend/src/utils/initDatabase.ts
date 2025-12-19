@@ -1,6 +1,7 @@
 import pool from '../config/database';
 import { migrateInitialData } from './migrateData';
-import { addLockColumn } from './migrations/addLockColumn'; // 🆕 DODANE
+import { addLockColumn } from './migrations/addLockColumn';
+import { createAnonymousUser } from './migrations/createAnonymousUser';
 
 export const initDatabase = async () => {
   const client = await pool.connect();
@@ -100,8 +101,11 @@ export const initDatabase = async () => {
     // Migracja początkowych danych
     await migrateInitialData();
 
-    // 🆕 DODANE: Migracja kolumny lockowania
+    // Migracja kolumny lockowania
     await addLockColumn();
+
+    // Utwórz użytkownika Anonymous
+    await createAnonymousUser();
 
   } catch (error) {
     console.error('❌ Błąd tworzenia tabel:', error);

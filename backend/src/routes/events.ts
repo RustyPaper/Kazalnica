@@ -5,10 +5,11 @@ import { AuthRequest, Event } from '../types';
 import { getAllEvents, getEventById, createEvent, updateEvent, deleteEvent } from '../utils/databaseStorage';
 import { authenticateToken, requirePermission, JWT_SECRET } from '../middleware/auth';
 import { getPolishHolidays } from '../utils/holidays';
+import { ANONYMOUS_USER_ID } from '../utils/migrations/createAnonymousUser'; // 🆕 DODANE
 
 const router = express.Router();
 
-// Get holidays for a year - PUBLICZNE (zmieniono)
+// Get holidays for a year - PUBLICZNE
 router.get('/holidays/:year', (req: Request, res: Response) => {
   const year = parseInt(req.params.year);
   
@@ -20,7 +21,7 @@ router.get('/holidays/:year', (req: Request, res: Response) => {
   res.json(holidays);
 });
 
-// Get all events - PUBLICZNE (zmieniono)
+// Get all events - PUBLICZNE
 router.get('/', async (req: Request, res: Response) => {
   try {
     const events = await getAllEvents();
@@ -31,7 +32,7 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// Create event - PUBLICZNE (każdy może dodać, ale rozróżniamy zalogowanych)
+// Create event - PUBLICZNE (każdy może dodać)
 router.post('/', async (req: Request, res: Response) => {
   try {
     const { date, apartmentNumber, description } = req.body;
@@ -44,7 +45,7 @@ router.post('/', async (req: Request, res: Response) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
     
-    let createdBy = 'anonymous'; // Domyślnie anonim
+    let createdBy = ANONYMOUS_USER_ID; // 🆕 ZMIENIONE: Użyj UUID użytkownika Anonymous
     
     if (token) {
       try {
@@ -52,8 +53,8 @@ router.post('/', async (req: Request, res: Response) => {
         createdBy = decoded.id; // Jeśli zalogowany, użyj ID użytkownika
         console.log('✅ Wydarzenie tworzone przez zalogowanego:', decoded.login);
       } catch (err) {
-        // Token nieprawidłowy, pozostaw jako anonymous
-        console.log('⚠️ Token nieprawidłowy, tworzę jako anonymous');
+        // Token nieprawidłowy, pozostaw jako Anonymous
+        console.log('⚠️ Token nieprawidłowy, tworzę jako Anonymous');
       }
     } else {
       console.log('📝 Wydarzenie tworzone przez anonima');
@@ -90,6 +91,11 @@ router.delete('/:eventId', authenticateToken, requirePermission('deleteEvent'), 
     const isAdmin = req.user!.role === 'admin';
     const isOwner = event.createdBy === req.user!.id;
     
+    // 🆕 DODANE: Nie można usunąć wydarzenia anonimowego jako zwykły user
+    if (event.createdBy === ANONYMOUS_USER_ID && !isAdmin) {
+      return res.status(403).json({ error: 'Tylko administrator może usuwać anonimowe wydarzenia' });
+    }
+    
     if (!isOwner && !isAdmin) {
       return res.status(403).json({ error: 'Możesz usuwać tylko swoje wydarzenia' });
     }
@@ -116,6 +122,11 @@ router.put('/:eventId', authenticateToken, requirePermission('addEvent'), async 
     // Sprawdź czy użytkownik stworzył wydarzenie lub jest adminem
     const isAdmin = req.user!.role === 'admin';
     const isOwner = event.createdBy === req.user!.id;
+    
+    // 🆕 DODANE: Nie można edytować wydarzenia anonimowego jako zwykły user
+    if (event.createdBy === ANONYMOUS_USER_ID && !isAdmin) {
+      return res.status(403).json({ error: 'Tylko administrator może edytować anonimowe wydarzenia' });
+    }
     
     if (!isOwner && !isAdmin) {
       return res.status(403).json({ error: 'Brak uprawnień do edycji tego wydarzenia' });
