@@ -39,11 +39,46 @@ router.put('/profile', authenticateToken, async (req: AuthRequest, res: Response
 
     if (firstName) updates.firstName = firstName;
     if (lastName !== undefined) updates.lastName = lastName;
-    
-    // POPRAWKA: Akceptuj pustą tablicę apartments
+
+    // Walidacja duplikatów
     if (apartments !== undefined) {
-      updates.apartments = apartments; // ✅ Nawet jeśli pusta tablica []
+      // Sprawdź duplikaty w publicznych lokalach
+      const { getAllPublicApartments } = await import('../utils/publicApartmentsStorage');
+      const publicApartments = await getAllPublicApartments();
+      
+      for (const apt of apartments) {
+        const duplicate = publicApartments.find(
+          pub => pub.apartmentNumber.trim().toUpperCase() === apt.number.trim().toUpperCase()
+        );
+        
+        if (duplicate) {
+          return res.status(400).json({ 
+            error: `Lokal ${apt.number} już istnieje na liście publicznej. Użyj funkcji "Przypisz do konta" zamiast dodawać ręcznie.` 
+          });
+        }
+      }
+      
+      // Sprawdź duplikaty u innych użytkowników
+      const allUsers = await getAllUsers();
+      for (const apt of apartments) {
+        for (const user of allUsers) {
+          if (user.id === req.user!.id) continue; // Pomiń siebie
+          
+          const duplicate = user.apartments.find(
+            userApt => userApt.number.trim().toUpperCase() === apt.number.trim().toUpperCase()
+          );
+          
+          if (duplicate) {
+            return res.status(400).json({ 
+              error: `Lokal ${apt.number} jest już przypisany do użytkownika: ${user.firstName} ${user.lastName || ''} (${user.login})` 
+            });
+          }
+        }
+      }
+      
+      updates.apartments = apartments;
     }
+
     
     if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber;
     if (email !== undefined) updates.email = email;

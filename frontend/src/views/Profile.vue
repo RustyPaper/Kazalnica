@@ -83,7 +83,7 @@
               <label>
                 Numer lokalu <span class="required">*</span>
               </label>
-              <input type="text" v-model="apartment.number" required />
+              <input type="text" v-model="apartment.number" required  @blur="checkDuplicate(apartment.number, index)"/>
             </div>
             
             <div class="form-group">
@@ -156,6 +156,13 @@
         </div>
       </form>
     </div>
+  <ApartmentDuplicateModal
+  v-if="showDuplicateModal && duplicateData"
+  :apartmentData="duplicateData"
+  @close="showDuplicateModal = false"
+  @claimed="onApartmentClaimed"
+  @edit="onEditPublic"
+/>
   </div>
 </template>
 
@@ -163,8 +170,13 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import type { Apartment } from '../types';
+import axios from 'axios';
+import { API_URL } from '../config';
+import ApartmentDuplicateModal from '../components/ApartmentDuplicateModal.vue';
+import { useRouter } from 'vue-router';
 
 const authStore = useAuthStore();
+const router = useRouter();
 
 const formData = ref({
   firstName: '',
@@ -180,6 +192,10 @@ const error = ref('');
 const success = ref('');
 const isSyncing = ref(false);
 let refreshInterval: number | null = null;
+
+// Stan dla modalu duplikatu
+const showDuplicateModal = ref(false);
+const duplicateData = ref<any>(null);
 
 // Auto-refresh co 30 sekund
 const startAutoRefresh = () => {
@@ -247,6 +263,61 @@ const removeApartment = (index: number) => {
   }
 };
 
+// 🆕 DODANE: Sprawdzenie duplikatu przy blur/change numeru lokalu
+const checkDuplicate = async (apartmentNumber: string, index: number) => {
+  if (!apartmentNumber.trim()) return;
+  
+  try {
+    const response = await axios.get(`${API_URL}/apartments/check/${encodeURIComponent(apartmentNumber)}`);
+    
+    if (response.data.exists) {
+      console.log('⚠️ Lokal już istnieje:', response.data);
+      
+      // Jeśli to lokal tego samego użytkownika (edycja), ignoruj
+      if (response.data.source === 'user' && response.data.owner.id === authStore.user?.id) {
+        console.log('✅ To mój lokal, ignoruję duplikat');
+        return;
+      }
+      
+      // Pokaż modal
+      duplicateData.value = response.data;
+      showDuplicateModal.value = true;
+      
+      // Usuń ten lokal z formularza (użytkownik zdecyduje co dalej)
+      formData.value.apartments.splice(index, 1);
+    }
+  } catch (err) {
+    console.error('❌ Błąd sprawdzania duplikatu:', err);
+  }
+};
+
+// 🆕 DODANE: Po przejęciu lokalu
+const onApartmentClaimed = async () => {
+  showDuplicateModal.value = false;
+  
+  // Odśwież profil
+  await authStore.fetchProfile();
+  
+  formData.value.apartments = JSON.parse(JSON.stringify(authStore.user?.apartments || []));
+  
+  success.value = '✅ Lokal został przypisany do Twojego konta!';
+  
+  setTimeout(() => {
+    success.value = '';
+  }, 5000);
+};
+
+// 🆕 DODANE: Przejdź do edycji publicznego
+const onEditPublic = (apartmentId: number) => {
+  // Przekieruj do statystyk z parametrem edycji
+    router.push({
+    path: '/statistics',
+    query: { edit: apartmentId }
+  })
+  console.log('Edycja publicznego lokalu:', apartmentId);
+  // TODO: Implementacja zależy od tego jak chcesz to obsłużyć
+};
+
 const handleUpdate = async () => {
   error.value = '';
   success.value = '';
@@ -258,6 +329,30 @@ const handleUpdate = async () => {
     error.value = 'Musisz podać przynajmniej jeden numer lokalu';
     isSyncing.value = false;
     return;
+  }
+
+   // 🆕 DODANE: Sprawdź duplikaty przed zapisem
+  for (let i = 0; i < validApartments.length; i++) {
+    const apt = validApartments[i];
+    try {
+      const response = await axios.get(`${API_URL}/apartments/check/${encodeURIComponent(apt.number)}`);
+      
+      if (response.data.exists) {
+        // Jeśli to nie mój lokal
+        if (!(response.data.source === 'user' && response.data.owner.id === authStore.user?.id)) {
+          error.value = `Lokal ${apt.number} już istnieje. Usuń duplikaty przed zapisem.`;
+          isSyncing.value = false;
+          
+          // Pokaż modal dla pierwszego duplikatu
+          duplicateData.value = response.data;
+          showDuplicateModal.value = true;
+          
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Błąd sprawdzania duplikatu:', err);
+    }
   }
   
   try {

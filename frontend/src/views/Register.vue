@@ -101,6 +101,7 @@
                 v-model="apartment.number" 
                 required 
                 placeholder="np. D.3.21"
+                @blur="checkDuplicate(apartment.number, index)"
               />
             </div>
             
@@ -176,6 +177,13 @@
         <router-link to="/login">Masz już konto? Zaloguj się</router-link>
       </div>
     </div>
+  <ApartmentDuplicateModal
+  v-if="showDuplicateModal && duplicateData"
+  :apartmentData="duplicateData"
+  @close="showDuplicateModal = false"
+  @claimed="onApartmentClaimed"
+  @edit="onEditPublic"
+/>
   </div>
 </template>
 
@@ -184,6 +192,9 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import type { Apartment } from '../types';
+import axios from 'axios';
+import { API_URL } from '../config';
+import ApartmentDuplicateModal from '../components/ApartmentDuplicateModal.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -202,6 +213,9 @@ const formData = ref({
 
 const error = ref('');
 
+const showDuplicateModal = ref(false);
+const duplicateData = ref<any>(null);
+
 const addApartment = () => {
   formData.value.apartments.push({
     number: '',
@@ -216,6 +230,45 @@ const removeApartment = (index: number) => {
   formData.value.apartments.splice(index, 1);
 };
 
+// 🆕 DODANE: Sprawdzenie duplikatu przy blur/change numeru lokalu
+const checkDuplicate = async (apartmentNumber: string, index: number) => {
+  if (!apartmentNumber.trim()) return;
+  
+  try {
+    const response = await axios.get(`${API_URL}/apartments/check/${encodeURIComponent(apartmentNumber)}`);
+    
+    if (response.data.exists) {
+      console.log('⚠️ Lokal już istnieje:', response.data);
+      
+      // Pokaż modal
+      duplicateData.value = response.data;
+      showDuplicateModal.value = true;
+      
+      // Usuń ten lokal z formularza (użytkownik zdecyduje co dalej)
+      formData.value.apartments.splice(index, 1);
+    }
+  } catch (err) {
+    console.error('❌ Błąd sprawdzania duplikatu:', err);
+  }
+};
+
+// 🆕 DODANE: Po przejęciu lokalu podczas rejestracji
+const onApartmentClaimed = async () => {
+  showDuplicateModal.value = false;
+  
+  error.value = '';
+  
+  // Po przejęciu, użytkownik jest już zarejestrowany i zalogowany
+  // więc przekieruj go do profilu
+  router.push('/profile');
+};
+
+// 🆕 DODANE: Przejdź do edycji publicznego (podczas rejestracji)
+const onEditPublic = (apartmentId: number) => {
+  showDuplicateModal.value = false;
+  error.value = 'Aby edytować ten lokal, najpierw ukończ rejestrację, zaloguj się, a następnie przejdź do statystyk.';
+};
+
 const handleRegister = async () => {
   error.value = '';
   
@@ -226,6 +279,26 @@ const handleRegister = async () => {
     return;
   }
   
+  // 🆕 DODANE: Sprawdź duplikaty przed rejestracją
+  for (let i = 0; i < validApartments.length; i++) {
+    const apt = validApartments[i];
+    try {
+      const response = await axios.get(`${API_URL}/apartments/check/${encodeURIComponent(apt.number)}`);
+      
+      if (response.data.exists) {
+        error.value = `Lokal ${apt.number} już istnieje. Sprawdź swoje lokale.`;
+        
+        // Pokaż modal dla pierwszego duplikatu
+        duplicateData.value = response.data;
+        showDuplicateModal.value = true;
+        
+        return;
+      }
+    } catch (err) {
+      console.error('Błąd sprawdzania duplikatu:', err);
+    }
+  }
+
   const result = await authStore.register({
     ...formData.value,
     apartments: validApartments

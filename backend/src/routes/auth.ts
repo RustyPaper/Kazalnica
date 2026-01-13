@@ -52,7 +52,7 @@ router.post('/login', async (req: Request, res: Response) => {
 // Register
 router.post('/register', async (req: Request, res: Response) => {
   try {
-    const { login, password, firstName, lastName, phoneNumber, email } = req.body;
+    const { login, password, firstName, lastName, phoneNumber, email, apartments } = req.body;
 
     if (!login || !password || !firstName) {
       return res.status(400).json({ error: 'Login, hasło i imię są wymagane' });
@@ -62,6 +62,40 @@ router.post('/register', async (req: Request, res: Response) => {
 
        if (existingUser) {
       return res.status(400).json({ error: 'Użytkownik o tym loginie już istnieje' });
+    }
+
+    // 🆕 DODANE: Walidacja duplikatów lokali
+    if (apartments && apartments.length > 0) {
+      const { getAllPublicApartments } = await import('../utils/publicApartmentsStorage');
+      const publicApartments = await getAllPublicApartments();
+      
+      for (const apt of apartments) {
+        const duplicate = publicApartments.find(
+          pub => pub.apartmentNumber.trim().toUpperCase() === apt.number.trim().toUpperCase()
+        );
+        
+        if (duplicate) {
+          return res.status(400).json({ 
+            error: `Lokal ${apt.number} już istnieje na liście publicznej. Zaloguj się i użyj funkcji "Przypisz do konta".` 
+          });
+        }
+      }
+      
+      // Sprawdź u innych użytkowników
+      const allUsers = await getAllUsers();
+      for (const apt of apartments) {
+        for (const user of allUsers) {
+          const duplicate = user.apartments.find(
+            userApt => userApt.number.trim().toUpperCase() === apt.number.trim().toUpperCase()
+          );
+          
+          if (duplicate) {
+            return res.status(400).json({ 
+              error: `Lokal ${apt.number} jest już przypisany do innego użytkownika.` 
+            });
+          }
+        }
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);

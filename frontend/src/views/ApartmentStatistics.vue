@@ -224,6 +224,16 @@
                         {{ apt.isLocked && authStore.isAdmin ? '🔒 Edytuj' : 'Edytuj' }}
                       </button>
 
+                      <!-- Przycisk odpinania (tylko admin dla lokali użytkowników) -->
+                          <button
+                            v-if="authStore.isAdmin && apt.source === 'user'"
+                            @click="detachApartment(apt)"
+                            class="btn-detach"
+                            title="Odepnij od użytkownika i przenieś do publicznych"
+                          >
+                            🔓 Odepnij
+                          </button>
+
                       <!-- Przycisk historii - tylko dla admina -->
                       <button
                         v-if="apt.source === 'public' && apt.id && authStore.isAdmin"
@@ -332,6 +342,30 @@ import { useAuthStore } from '../stores/auth';
 import { API_URL } from '../config';
 import AddApartmentModal from '../components/AddApartmentModal.vue';
 import EditApartmentModal from '../components/EditApartmentModal.vue';
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
+
+// 🆕 DODANE: Sprawdź query params przy montowaniu
+onMounted(async () => {
+  await fetchSettings()
+  await fetchStatistics()
+  
+  // Jeśli jest parametr ?edit=ID, otwórz modal edycji
+  const editId = route.query.edit
+  if (editId) {
+    const id = parseInt(editId as string, 10)
+    if (!isNaN(id)) {
+      const apartment = statistics.value?.apartments.find(
+        apt => apt.source === 'public' && apt.id === id
+      )
+      
+      if (apartment) {
+        editApartment(apartment)
+      }
+    }
+  }
+})
 
 const authStore = useAuthStore();
 
@@ -390,7 +424,7 @@ const formatDateTime = (dateString: string): string => {
   });
 };
 
-// 🆕 Funkcja sortująca (identyczna jak backend)
+// Funkcja sortująca (identyczna jak backend)
 const sortApartmentsByNumber = (apartments: any[]): any[] => {
   return [...apartments].sort((a, b) => {
     const numberA = a.number.trim().toUpperCase();
@@ -553,7 +587,7 @@ const filteredTotalShares = computed(() => {
   }, 0);
 });
 
-// 🆕 ZAKTUALIZOWANA funkcja canEditApartment
+// ZAKTUALIZOWANA funkcja canEditApartment
 const canEditApartment = (apt: any): boolean => {
   // Publiczne lokale
   if (apt.source === 'public') {
@@ -587,7 +621,7 @@ const editApartment = (apt: any) => {
     _originalNumber: apt.number,
     _id: apt.id,
     _userId: apt.userId,
-    isLocked: apt.isLocked // 🆕 DODANE: Przekaż status blokady
+    isLocked: apt.isLocked
   };
   showEditModal.value = true;
 };
@@ -598,7 +632,7 @@ const onApartmentUpdated = () => {
   apartmentToEdit.value = null;
 };
 
-// 🆕 POPRAWIONA funkcja showHistory - dodano token autoryzacji
+// POPRAWIONA funkcja showHistory - dodano token autoryzacji
 const showHistory = async (aptId: number) => {
   try {
     historyLoading.value = true;
@@ -608,7 +642,7 @@ const showHistory = async (aptId: number) => {
       `${API_URL}/public-apartments/${aptId}/history`,
       {
         headers: {
-          Authorization: `Bearer ${authStore.token}` // 🆕 DODANE: Token
+          Authorization: `Bearer ${authStore.token}`
         }
       }
     );
@@ -629,7 +663,42 @@ const closeHistoryModal = () => {
   historyApartmentId.value = null;
 };
 
-// 🆕 NOWA funkcja toggleLock
+// Funkcja odpinania lokalu od użytkownika
+const detachApartment = async (apt: any) => {
+  if (!confirm(`Czy na pewno chcesz odpiąć lokal ${apt.number} od użytkownika ${apt.ownerName}?\n\nLokal zostanie przeniesiony do publicznych.`)) {
+    return;
+  }
+
+  try {
+    const userId = apt.userId;
+    const apartmentNumber = apt.number;
+
+    await axios.post(
+      `${API_URL}/apartments/detach/${userId}/${encodeURIComponent(apartmentNumber)}`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${authStore.token}`
+        }
+      }
+    );
+
+    success.value = `✅ Lokal ${apartmentNumber} został odpięty i przeniesiony do publicznych`;
+    
+    // Odśwież statystyki
+    await fetchStatistics();
+    
+    setTimeout(() => {
+      success.value = '';
+    }, 5000);
+
+  } catch (err: any) {
+    console.error('❌ Błąd odpinania lokalu:', err);
+    error.value = err.response?.data?.error || 'Błąd odpinania lokalu';
+  }
+};
+
+// Funkcja toggleLock
 const toggleLock = async (apt: any) => {
   if (!authStore.isAdmin) {
     error.value = 'Tylko administrator może blokować lokale';
@@ -1317,6 +1386,37 @@ code {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
+  }
+}
+
+.btn-detach {
+  background: #fd7e14;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.btn-detach:hover {
+  background: #e8590c;
+}
+
+@media (max-width: 768px) {
+  .btn-detach {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .btn-detach {
+    font-size: 10px;
+    padding: 3px 6px;
   }
 }
 

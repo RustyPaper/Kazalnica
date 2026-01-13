@@ -84,6 +84,7 @@ router.get('/apartments', async (req: Request, res: Response) => {
     users.forEach(user => {
       user.apartments.forEach(apt => {
         allApartments.push({
+          id: null,  // ⭐ DODANE - lokale użytkowników nie mają osobnego ID
           number: apt.number,
           shareAmount: apt.shareAmount,
           additionalInfo: apt.additionalInfo,
@@ -92,9 +93,11 @@ router.get('/apartments', async (req: Request, res: Response) => {
           ownerName: `${user.firstName} ${user.lastName || ''}`.trim(),
           ownerLogin: user.login,
           userId: user.id,
-          source: "user",
+          source: 'user' as const,
           phoneNumber: user.phoneNumber,
           email: user.email,
+          ownerFirstName: user.firstName,  // ⭐ DODANE
+          ownerLastName: user.lastName,    // ⭐ DODANE
           isLocked: false
         });
       });
@@ -110,14 +113,15 @@ router.get('/apartments', async (req: Request, res: Response) => {
         additionalInfo: apt.additionalInfo,
         status: apt.status,
         collectionDate: apt.collectionDate,
-        ownerName: `${apt.ownerFirstName ?? ''} ${apt.ownerLastName ?? ''}`.trim(),
+        ownerName: `${apt.ownerFirstName ?? ''} ${apt.ownerLastName ?? ''}`.trim() || 'Brak danych',
         ownerLogin: null,
-        source: "public",
+        userId: null,  // ⭐ DODANE - publiczne nie mają userId
+        source: 'public' as const,
         phoneNumber: apt.phoneNumber,
         email: apt.email,
         ownerFirstName: apt.ownerFirstName,
         ownerLastName: apt.ownerLastName,
-        isLocked: apt.isLocked || false
+        isLocked: apt.isLocked
       });
     });
 
@@ -159,7 +163,7 @@ router.get('/apartments', async (req: Request, res: Response) => {
       totalShares,
       sharePercentage: totalSharesTarget > 0 ? (totalShares / totalSharesTarget) * 100 : 0,
       totalApartments: sortedApartments.length,
-      apartments: sortedApartments, // 🆕 Już posortowane
+      apartments: sortedApartments,
       statusGroups,
       statusCounts: {
         lease_agreement: statusGroups.lease_agreement.length,

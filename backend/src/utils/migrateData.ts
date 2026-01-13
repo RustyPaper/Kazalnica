@@ -21,7 +21,8 @@ export const migrateInitialData = async () => {
           number: 'D.3.21',
           shareAmount: '76',
           additionalInfo: 'Widok na hotel. Krótki balkon. Parking nr 63',
-          status: 'lease_agreement'
+          status: 'lease_agreement',
+          collectionDate: null
         }
       ],
       role: 'admin',
