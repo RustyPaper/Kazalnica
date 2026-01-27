@@ -126,7 +126,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import type { PollWithOptions } from '../types/polls';
+import type { PollWithOptions } from '../types/index.ts';
 import { votePoll, getApartmentData } from '../api/polls';
 
 interface Props {

@@ -44,6 +44,13 @@
           <button @click="viewPoll(poll.id)" class="btn-secondary">
             {{ poll.isClosed ? '📊 Zobacz wyniki' : '🗳️ Głosuj' }}
           </button>
+            <button 
+              @click="viewResults(poll.id)" 
+              class="btn-info"
+              title="Zobacz aktualne wyniki"
+            >
+              📊 Wyniki
+            </button>
           
           <template v-if="isAdmin">
             <button 
@@ -88,9 +95,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { useAuthStore } from '../stores/auth.ts';
+import { useAuthStore } from '../stores/auth';
 import { getPolls, closePoll, reopenPoll, deletePoll } from '../api/polls';
-import type { Poll } from '../types/index.ts';
+import type { Poll } from '../types/index';
 import CreatePollModal from '../components/CreatePollModal.vue';
 
 const router = useRouter();
@@ -102,7 +109,8 @@ const loading = ref(false);
 
 const isAdmin = computed(() => userStore.user?.role === 'admin');
 
-const fetchPolls = async () => {
+// ✅ Funkcja pobierania ankiet
+const fetchPolls = async (): Promise<void> => {
   try {
     loading.value = true;
     polls.value = await getPolls();
@@ -114,11 +122,22 @@ const fetchPolls = async () => {
   }
 };
 
-const viewPoll = (pollId: string) => {
+// ✅ Przejście do szczegółów ankiety
+const viewPoll = (pollId: string): void => {
   router.push(`/polls/${pollId}`);
 };
 
-const closePollConfirm = async (pollId: string) => {
+// ⭐ NOWA: Przejście do wyników ankiety
+const viewResults = (pollId: string): void => {
+  router.push({
+    name: 'PollDetail',
+    params: { id: pollId },
+    query: { tab: 'results' }
+  });
+};
+
+// ✅ Zamykanie ankiety
+const closePollConfirm = async (pollId: string): Promise<void> => {
   if (!confirm('Czy na pewno chcesz zamknąć tę ankietę?')) return;
   
   try {
@@ -130,7 +149,8 @@ const closePollConfirm = async (pollId: string) => {
   }
 };
 
-const reopenPollAction = async (pollId: string) => {
+// ✅ Ponowne otwieranie ankiety
+const reopenPollAction = async (pollId: string): Promise<void> => {
   try {
     await reopenPoll(pollId);
     await fetchPolls();
@@ -140,7 +160,8 @@ const reopenPollAction = async (pollId: string) => {
   }
 };
 
-const deletePollConfirm = async (pollId: string) => {
+// ✅ Usuwanie ankiety
+const deletePollConfirm = async (pollId: string): Promise<void> => {
   if (!confirm('Czy na pewno chcesz usunąć tę ankietę? Ta operacja jest nieodwracalna!')) return;
   
   try {
@@ -152,12 +173,14 @@ const deletePollConfirm = async (pollId: string) => {
   }
 };
 
-const onPollCreated = () => {
+// ✅ Callback po utworzeniu ankiety
+const onPollCreated = (): void => {
   showCreateModal.value = false;
   fetchPolls();
 };
 
-const formatDate = (dateString: string) => {
+// ✅ Formatowanie daty
+const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
   return date.toLocaleDateString('pl-PL', {
     year: 'numeric',
@@ -342,5 +365,13 @@ onMounted(() => {
   .poll-actions button {
     width: 100%;
   }
+}
+.btn-info {
+  background: #17a2b8;
+  color: white;
+}
+
+.btn-info:hover {
+  background: #138496;
 }
 </style>

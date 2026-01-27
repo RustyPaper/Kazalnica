@@ -13,6 +13,24 @@
         <p v-if="poll.description" class="poll-description">{{ poll.description }}</p>
       </div>
 
+      <!-- ⭐ Zakładki (Tabs) -->
+      <div class="tabs" v-if="!poll.isClosed">
+        <button 
+          @click="showResults = false" 
+          :class="{ active: !showResults }"
+          class="tab-btn"
+        >
+          🗳️ Głosowanie
+        </button>
+        <button 
+          @click="showResults = true" 
+          :class="{ active: showResults }"
+          class="tab-btn"
+        >
+          📊 Wyniki
+        </button>
+      </div>
+
       <!-- Formularz głosowania (jeśli otwarta) -->
       <VoteForm
         v-if="!poll.isClosed && !showResults"
@@ -40,7 +58,7 @@
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { getPoll } from '../api/polls';
-import type { PollWithOptions } from '../types/polls';
+import type { PollWithOptions } from '../types/index';
 import VoteForm from '../components/VoteForm.vue';
 import PollResults from '../components/PollResults.vue';
 
@@ -51,13 +69,13 @@ const poll = ref<PollWithOptions | null>(null);
 const loading = ref(true);
 const showResults = ref(false);
 
-const fetchPoll = async () => {
+const fetchPoll = async (): Promise<void> => {
   try {
     loading.value = true;
     const pollId = route.params.id as string;
     poll.value = await getPoll(pollId);
     
-    // Jeśli ankieta zamknięta, od razu pokaż wyniki
+    // ⭐ Jeśli ankieta zamknięta, od razu pokaż wyniki
     if (poll.value.isClosed) {
       showResults.value = true;
     }
@@ -68,16 +86,23 @@ const fetchPoll = async () => {
   }
 };
 
-const onVoted = () => {
+const onVoted = (): void => {
   showResults.value = true;
+  fetchPoll(); // Odśwież dane po głosowaniu
 };
 
-const goBack = () => {
+const goBack = (): void => {
   router.push('/polls');
 };
 
-onMounted(() => {
-  fetchPoll();
+// ⭐ ZMODYFIKOWANY onMounted - obsługa ?tab=results
+onMounted(async () => {
+  await fetchPoll();
+  
+  // Jeśli URL zawiera ?tab=results, pokaż od razu wyniki
+  if (route.query.tab === 'results') {
+    showResults.value = true;
+  }
 });
 </script>
 
@@ -149,6 +174,36 @@ onMounted(() => {
   margin-top: 0.5rem;
 }
 
+/* ⭐ NOWE: Style dla zakładek */
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  cursor: pointer;
+  color: #6c757d;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.tab-btn:hover {
+  color: #007bff;
+  background: #f8f9fa;
+}
+
+.tab-btn.active {
+  color: #007bff;
+  border-bottom-color: #007bff;
+}
+
 @media (max-width: 768px) {
   .poll-detail-view {
     padding: 1rem;
@@ -161,6 +216,15 @@ onMounted(() => {
   .poll-header h1 {
     font-size: 1.5rem;
   }
+
+  .tabs {
+    gap: 0;
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 0.75rem 0.5rem;
+    font-size: 0.9rem;
+  }
 }
 </style>
-
