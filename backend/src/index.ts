@@ -13,6 +13,7 @@ import publicApartmentsRouter from './routes/publicApartments';
 import apartmentsRoutes from './routes/apartments';
 import backupRoutes from './routes/backup';
 import { initDatabase } from './utils/initDatabase';
+import pollsRoutes from './routes/polls';
 
 dotenv.config();
 
@@ -87,6 +88,7 @@ app.use('/api/statistics', statisticsRoutes);
 app.use('/api/public-apartments', publicApartmentsRouter);
 app.use('/api/apartments', apartmentsRoutes);
 app.use('/api/backup', backupRoutes);
+app.use('/api/polls', pollsRoutes);
 
 // ============= HEALTH CHECK =============
 app.get('/api/health', (req, res) => {

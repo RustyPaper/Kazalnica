@@ -23,7 +23,11 @@
                 📅 Kalendarz
               </router-link>
             </li>
-          
+            <li>
+                <router-link to="/polls" class="nav-link">
+                📊 Ankiety
+                </router-link>
+            </li>
           <!-- Dla niezalogowanych użytkowników -->
           <template v-if="!authStore.isAuthenticated">
             <li>
@@ -35,8 +39,10 @@
               <router-link to="/register" :class="{ active: $route.path === '/register' }" @click="closeMenu">
                 ✍️ Zarejestruj
               </router-link>
-            </li>
+            </li>  
           </template>
+
+          
           
           <!-- Dla zalogowanych użytkowników -->
           <template v-else>

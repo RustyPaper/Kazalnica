@@ -151,3 +151,60 @@ export type ApartmentStatus =
 export type UserRole = 'admin' | 'user';
 
 export type ApartmentSource = 'user' | 'public';
+
+// ============================================
+// POLLS TYPES
+// ============================================
+
+export interface Poll {
+  id: string;
+  title: string;
+  description: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  closesAt: string | null;
+  isClosed: boolean;
+  allowMultipleVotes: boolean;
+}
+
+export interface PollOption {
+  id: string;
+  pollId: string;
+  optionText: string;
+  optionOrder: number;
+  createdAt: string;
+}
+
+export interface PollVoteApartment {
+  number: string;
+  shareAmount: string | null;
+}
+
+export interface PollVote {
+  id: string;
+  pollId: string;
+  optionId: string;
+  voterName: string | null;
+  voterPhone: string | null;
+  apartments: PollVoteApartment[];
+  totalShares: number;
+  ipAddress: string | null;
+  userAgent: string | null;
+  votedAt: string;
+}
+
+export interface PollWithOptions extends Poll {
+  options: PollOption[];
+}
+
+export interface PollWithResults extends PollWithOptions {
+  results: {
+    optionId: string;
+    optionText: string;
+    voteCount: number;
+    shareCount: number;
+    percentage: number;
+  }[];
+  totalVotes: number;
+  totalShares: number;
+}

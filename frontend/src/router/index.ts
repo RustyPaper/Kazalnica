@@ -51,6 +51,16 @@ const routes: RouteRecordRaw[] = [
     component: BackupView,
     meta: { requiresAuth: true, requiresAdmin: true }
   },
+  {
+  path: '/polls',
+  name: 'Polls',
+  component: () => import('../views/PollsView.vue')
+  },
+  {
+  path: '/polls/:id',
+  name: 'PollDetail',
+  component: () => import('../views/PollDetailView.vue')
+  }
 ];
 
 const router = createRouter({

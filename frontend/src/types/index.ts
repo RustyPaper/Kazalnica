@@ -118,3 +118,54 @@ export interface ApartmentStatistics {
     public: number;
   };
 }
+
+export interface Poll {
+  id: string;
+  title: string;
+  description: string | null;
+  createdBy: string | null;
+  createdByName?: string;
+  createdAt: string;
+  closesAt: string | null;
+  isClosed: boolean;
+  allowMultipleVotes: boolean;
+}
+
+export interface PollOption {
+  id: string;
+  pollId: string;
+  optionText: string;
+  optionOrder: number;
+  createdAt: string;
+}
+
+export interface PollWithOptions extends Poll {
+  options: PollOption[];
+}
+
+export interface PollResult {
+  optionId: string;
+  optionText: string;
+  voteCount: number;
+  shareCount: number;
+  percentage: number;
+}
+
+export interface PollWithResults extends PollWithOptions {
+  results: PollResult[];
+  totalVotes: number;
+  totalShares: number;
+}
+
+export interface VoteApartment {
+  number: string;
+  shareAmount: string | null;
+}
+
+export interface VoteData {
+  optionId: string;
+  apartments: VoteApartment[];
+  voterName?: string;
+  voterPhone?: string;
+}
+
